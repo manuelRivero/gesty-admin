@@ -11,34 +11,35 @@ import { Button } from "@/components/ui/button"
 import {
   MoreHorizontal,
   Eye,
-  CreditCard,
+  SlidersHorizontal,
   CalendarPlus,
+  RefreshCw,
   Ban,
   Unlock,
-  RotateCcw,
+  CircleStop,
 } from "lucide-react"
-import type { BusinessWithSubscription, BusinessStatus } from "./types"
 
 interface BusinessActionsDropdownProps {
-  business: BusinessWithSubscription
-  status: BusinessStatus
+  aiBlocked: boolean
+  hasStripeSubscription: boolean
   onViewDetails: () => void
-  onChangePlan: () => void
-  onExtendSubscription: () => void
+  onOverride: () => void
+  onGrantTrial: () => void
+  onSyncStripe: () => void
+  onCancelBilling: () => void
   onToggleBlock: () => void
-  onResetTokens: () => void
 }
 
 export function BusinessActionsDropdown({
-  status,
+  aiBlocked,
+  hasStripeSubscription,
   onViewDetails,
-  onChangePlan,
-  onExtendSubscription,
+  onOverride,
+  onGrantTrial,
+  onSyncStripe,
+  onCancelBilling,
   onToggleBlock,
-  onResetTokens,
 }: BusinessActionsDropdownProps) {
-  const isBlocked = status === "Blocked"
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -47,37 +48,47 @@ export function BusinessActionsDropdown({
           <span className="sr-only">Abrir menú de acciones</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48">
+      <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuItem onClick={onViewDetails}>
           <Eye className="size-4" />
           Ver detalle
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={onChangePlan}>
-          <CreditCard className="size-4" />
-          Cambiar plan
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={onExtendSubscription}>
+        <DropdownMenuItem onClick={onGrantTrial}>
           <CalendarPlus className="size-4" />
-          Extender suscripción
+          Otorgar trial
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={onOverride}>
+          <SlidersHorizontal className="size-4" />
+          Override cupo
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={onSyncStripe}
+          disabled={!hasStripeSubscription}
+        >
+          <RefreshCw className="size-4" />
+          Sync Stripe
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={onCancelBilling}
+          disabled={!hasStripeSubscription}
+        >
+          <CircleStop className="size-4" />
+          Cancelar al fin del período
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={onToggleBlock}>
-          {isBlocked ? (
+          {aiBlocked ? (
             <>
               <Unlock className="size-4" />
-              Desbloquear
+              Desbloquear IA
             </>
           ) : (
             <>
               <Ban className="size-4" />
-              Bloquear
+              Bloquear IA
             </>
           )}
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={onResetTokens}>
-          <RotateCcw className="size-4" />
-          Reiniciar tokens
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

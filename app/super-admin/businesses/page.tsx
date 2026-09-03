@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { useRouter } from "next/navigation"
-import { isAxiosError } from "axios"
 import { toast } from "sonner"
-import { Search } from "lucide-react"
+import { Plus, Search } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -18,16 +18,33 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { BusinessesTable } from "@/components/super-admin/businesses-table"
-import { ChangePlanModal } from "@/components/super-admin/change-plan-modal"
-import { ExtendSubscriptionModal } from "@/components/super-admin/extend-subscription-modal"
+import { GrantTrialModal } from "@/components/super-admin/grant-trial-modal"
+import { BillingOverrideModal } from "@/components/super-admin/billing-override-modal"
 import { BlockModal } from "@/components/super-admin/block-modal"
-import { ResetTokensModal } from "@/components/super-admin/reset-tokens-modal"
-import type { BusinessWithSubscription, Subscription } from "@/components/super-admin/types"
-import { getBusinessStatus } from "@/components/super-admin/types"
+import { CancelBillingModal } from "@/components/super-admin/cancel-billing-modal"
+import { CreateBusinessModal } from "@/components/super-admin/create-business-modal"
+import type {
+  BusinessListFilter,
+  BusinessWithSubscription,
+} from "@/components/super-admin/types"
+import { matchesBusinessListFilter } from "@/components/super-admin/types"
 import {
+  createBusinessErrorMessage,
+  createSuperAdminBusiness,
   fetchSuperAdminBusinesses,
+  type CreateSuperAdminBusinessPayload,
 } from "@/lib/requests/super-admin-businesses"
+import {
+  cancelSuperAdminBilling,
+  grantSuperAdminTrial,
+  patchSuperAdminBilling,
+  superAdminBillingErrorMessage,
+  syncSuperAdminStripe,
+  type GrantTrialPayload,
+  type PatchSuperAdminBillingPayload,
+} from "@/lib/requests/super-admin-billing"
 
 const ITEMS_PER_PAGE = 8
 
@@ -38,14 +55,19 @@ export default function BusinessesPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [debouncedQ, setDebouncedQ] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
+  const [filter, setFilter] = useState<BusinessListFilter>("all")
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [pending, setPending] = useState(false)
 
-  const [selectedBusiness, setSelectedBusiness] = useState<BusinessWithSubscription | null>(null)
-  const [changePlanOpen, setChangePlanOpen] = useState(false)
-  const [extendOpen, setExtendOpen] = useState(false)
+  const [selectedBusiness, setSelectedBusiness] =
+    useState<BusinessWithSubscription | null>(null)
+  const [grantTrialOpen, setGrantTrialOpen] = useState(false)
+  const [overrideOpen, setOverrideOpen] = useState(false)
   const [blockOpen, setBlockOpen] = useState(false)
-  const [resetTokensOpen, setResetTokensOpen] = useState(false)
+  const [cancelOpen, setCancelOpen] = useState(false)
+  const [createOpen, setCreateOpen] = useState(false)
+  const [createPending, setCreatePending] = useState(false)
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedQ(searchQuery.trim()), 400)
@@ -68,12 +90,9 @@ export default function BusinessesPage() {
       setBusinesses(items)
       setTotal(count)
     } catch (e) {
-      const msg = isAxiosError(e)
-        ? (e.response?.data as { message?: string; error?: string })?.message ??
-          (e.response?.data as { message?: string; error?: string })?.error ??
-          e.message
-        : "No se pudieron cargar los negocios."
-      setLoadError(typeof msg === "string" && msg ? msg : "No se pudieron cargar los negocios.")
+      setLoadError(
+        superAdminBillingErrorMessage(e, "No se pudieron cargar los negocios."),
+      )
     } finally {
       setIsLoading(false)
     }
@@ -83,113 +102,114 @@ export default function BusinessesPage() {
     void loadList()
   }, [loadList])
 
-  const handleSearchChange = (value: string) => {
-    setSearchQuery(value)
-  }
+  const visibleBusinesses = useMemo(
+    () => businesses.filter((item) => matchesBusinessListFilter(item, filter)),
+    [businesses, filter],
+  )
 
-  const handleViewDetails = (business: BusinessWithSubscription) => {
-    router.push(`/super-admin/businesses/${business.id}`)
-  }
-
-  const handleChangePlan = (business: BusinessWithSubscription) => {
-    setSelectedBusiness(business)
-    setChangePlanOpen(true)
-  }
-
-  const handleExtendSubscription = (business: BusinessWithSubscription) => {
-    setSelectedBusiness(business)
-    setExtendOpen(true)
-  }
-
-  const handleToggleBlock = (business: BusinessWithSubscription) => {
-    setSelectedBusiness(business)
-    setBlockOpen(true)
-  }
-
-  const handleResetTokens = (business: BusinessWithSubscription) => {
-    setSelectedBusiness(business)
-    setResetTokensOpen(true)
-  }
-
-  const confirmChangePlan = (plan: Subscription["plan_name"]) => {
-    if (!selectedBusiness) return
-
-    const tokenLimits: Record<Subscription["plan_name"], number> = {
-      Basic: 50000,
-      Pro: 100000,
-      Business: 250000,
+  const runMutation = async (
+    action: () => Promise<unknown>,
+    successMessage: string,
+  ) => {
+    setPending(true)
+    try {
+      await action()
+      toast.success(successMessage)
+      setGrantTrialOpen(false)
+      setOverrideOpen(false)
+      setBlockOpen(false)
+      setCancelOpen(false)
+      await loadList()
+    } catch (err) {
+      toast.error(superAdminBillingErrorMessage(err, "No se pudo completar la acción."))
+    } finally {
+      setPending(false)
     }
-
-    setBusinesses((prev) =>
-      prev.map((b) =>
-        b.id === selectedBusiness.id
-          ? {
-              ...b,
-              ai_monthly_token_limit: tokenLimits[plan],
-              subscription: { ...b.subscription, plan_name: plan },
-            }
-          : b,
-      ),
-    )
-    toast.success(`Plan cambiado a ${plan} para ${selectedBusiness.name}`)
   }
 
-  const confirmExtendSubscription = (newEndDate: Date) => {
+  const handleGrantTrial = async (payload: GrantTrialPayload) => {
     if (!selectedBusiness) return
-    setBusinesses((prev) =>
-      prev.map((b) =>
-        b.id === selectedBusiness.id
-          ? {
-              ...b,
-              subscription: {
-                ...b.subscription,
-                current_period_end: newEndDate.toISOString(),
-              },
-            }
-          : b,
-      ),
+    await runMutation(
+      () => grantSuperAdminTrial(selectedBusiness.id, payload),
+      `Trial otorgado a ${selectedBusiness.name}`,
     )
-    toast.success(`Suscripción extendida para ${selectedBusiness.name}`)
   }
 
-  const confirmToggleBlock = () => {
+  const handleOverride = async (payload: PatchSuperAdminBillingPayload) => {
     if (!selectedBusiness) return
-    const wasBlocked = selectedBusiness.ai_blocked
-    setBusinesses((prev) =>
-      prev.map((b) =>
-        b.id === selectedBusiness.id ? { ...b, ai_blocked: !b.ai_blocked } : b,
-      ),
-    )
-    toast.success(
-      wasBlocked
-        ? `${selectedBusiness.name} fue desbloqueado`
-        : `${selectedBusiness.name} fue bloqueado`,
+    await runMutation(
+      () => patchSuperAdminBilling(selectedBusiness.id, payload),
+      `Cupo actualizado para ${selectedBusiness.name}`,
     )
   }
 
-  const confirmResetTokens = () => {
+  const handleToggleBlock = async () => {
     if (!selectedBusiness) return
-    setBusinesses((prev) =>
-      prev.map((b) =>
-        b.id === selectedBusiness.id ? { ...b, ai_monthly_tokens_used: 0 } : b,
-      ),
+    const nextBlocked = !selectedBusiness.ai_blocked
+    await runMutation(
+      () =>
+        patchSuperAdminBilling(selectedBusiness.id, { ai_blocked: nextBlocked }),
+      nextBlocked
+        ? `${selectedBusiness.name} bloqueado`
+        : `${selectedBusiness.name} desbloqueado`,
     )
-    toast.success(`Tokens reiniciados para ${selectedBusiness.name}`)
   }
 
-  const selectedStatus = selectedBusiness
-    ? getBusinessStatus(selectedBusiness, selectedBusiness.subscription)
-    : "Active"
+  const handleSyncStripe = async (business: BusinessWithSubscription) => {
+    setPending(true)
+    try {
+      await syncSuperAdminStripe(business.id)
+      toast.success(`Stripe sincronizado para ${business.name}`)
+      await loadList()
+    } catch (err) {
+      toast.error(superAdminBillingErrorMessage(err, "No se pudo sincronizar Stripe."))
+    } finally {
+      setPending(false)
+    }
+  }
+
+  const handleCancelBilling = async () => {
+    if (!selectedBusiness) return
+    await runMutation(
+      () => cancelSuperAdminBilling(selectedBusiness.id),
+      `Cancelación programada para ${selectedBusiness.name}`,
+    )
+  }
+
+  const handleCreateBusiness = async (
+    payload: CreateSuperAdminBusinessPayload,
+  ) => {
+    setCreatePending(true)
+    try {
+      const created = await createSuperAdminBusiness(payload)
+      toast.success(`Negocio “${created.name}” creado`)
+      if (created.owner.created) {
+        toast.message("Usuario creado. Guardá la contraseña que ingresaste.")
+      }
+      setCreateOpen(false)
+      router.push(`/super-admin/businesses/${created.id}`)
+    } catch (err) {
+      toast.error(createBusinessErrorMessage(err))
+    } finally {
+      setCreatePending(false)
+    }
+  }
 
   const totalPages = Math.max(1, Math.ceil(total / ITEMS_PER_PAGE))
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Negocios</h1>
-        <p className="text-muted-foreground">
-          Administrá negocios y suscripciones
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-semibold tracking-tight">Negocios</h1>
+          <p className="text-muted-foreground">
+            Administrá negocios y suscripciones
+          </p>
+        </div>
+        <Button onClick={() => setCreateOpen(true)}>
+          <Plus className="size-4" />
+          Crear negocio
+        </Button>
       </div>
 
       {loadError ? (
@@ -200,16 +220,34 @@ export default function BusinessesPage() {
       ) : null}
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between border-b pb-4">
+        <CardHeader className="flex flex-col gap-4 border-b pb-4 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle className="text-base font-medium">Todos los negocios</CardTitle>
-          <div className="relative w-64">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por nombre..."
-              value={searchQuery}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              className="pl-9"
-            />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <ToggleGroup
+              type="single"
+              variant="outline"
+              size="sm"
+              value={filter}
+              onValueChange={(value) => {
+                if (value) setFilter(value as BusinessListFilter)
+              }}
+              className="flex-wrap justify-start"
+            >
+              <ToggleGroupItem value="all">Todos</ToggleGroupItem>
+              <ToggleGroupItem value="no_sub">Sin sub</ToggleGroupItem>
+              <ToggleGroupItem value="trial_expiring">Trial por vencer</ToggleGroupItem>
+              <ToggleGroupItem value="past_due">Past due</ToggleGroupItem>
+              <ToggleGroupItem value="blocked">Bloqueados</ToggleGroupItem>
+            </ToggleGroup>
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por nombre..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -221,12 +259,27 @@ export default function BusinessesPage() {
             </div>
           ) : (
             <BusinessesTable
-              businesses={businesses}
-              onViewDetails={handleViewDetails}
-              onChangePlan={handleChangePlan}
-              onExtendSubscription={handleExtendSubscription}
-              onToggleBlock={handleToggleBlock}
-              onResetTokens={handleResetTokens}
+              businesses={visibleBusinesses}
+              onViewDetails={(business) =>
+                router.push(`/super-admin/businesses/${business.id}`)
+              }
+              onOverride={(business) => {
+                setSelectedBusiness(business)
+                setOverrideOpen(true)
+              }}
+              onGrantTrial={(business) => {
+                setSelectedBusiness(business)
+                setGrantTrialOpen(true)
+              }}
+              onSyncStripe={(business) => void handleSyncStripe(business)}
+              onCancelBilling={(business) => {
+                setSelectedBusiness(business)
+                setCancelOpen(true)
+              }}
+              onToggleBlock={(business) => {
+                setSelectedBusiness(business)
+                setBlockOpen(true)
+              }}
             />
           )}
         </CardContent>
@@ -299,34 +352,49 @@ export default function BusinessesPage() {
         <p className="text-center text-sm text-muted-foreground">
           {total === 0
             ? "Sin resultados"
-            : `Mostrando ${(currentPage - 1) * ITEMS_PER_PAGE + 1}–${Math.min(currentPage * ITEMS_PER_PAGE, total)} de ${total}`}
+            : filter === "all"
+              ? `Mostrando ${(currentPage - 1) * ITEMS_PER_PAGE + 1}–${Math.min(currentPage * ITEMS_PER_PAGE, total)} de ${total}`
+              : `${visibleBusinesses.length} en esta página (filtro local)`}
         </p>
       ) : null}
 
-      <ChangePlanModal
-        business={selectedBusiness}
-        open={changePlanOpen}
-        onOpenChange={setChangePlanOpen}
-        onConfirm={confirmChangePlan}
+      <GrantTrialModal
+        businessName={selectedBusiness?.name ?? null}
+        open={grantTrialOpen}
+        pending={pending}
+        onOpenChange={setGrantTrialOpen}
+        onConfirm={handleGrantTrial}
       />
-      <ExtendSubscriptionModal
-        business={selectedBusiness}
-        open={extendOpen}
-        onOpenChange={setExtendOpen}
-        onConfirm={confirmExtendSubscription}
+      <BillingOverrideModal
+        businessName={selectedBusiness?.name ?? null}
+        open={overrideOpen}
+        pending={pending}
+        initialPlan={selectedBusiness?.subscription.plan_name}
+        initialTokenLimit={selectedBusiness?.ai_monthly_token_limit}
+        initialBlocked={selectedBusiness?.ai_blocked}
+        onOpenChange={setOverrideOpen}
+        onConfirm={handleOverride}
       />
       <BlockModal
-        business={selectedBusiness}
-        status={selectedStatus}
+        businessName={selectedBusiness?.name ?? null}
+        isBlocked={selectedBusiness?.ai_blocked ?? false}
         open={blockOpen}
+        pending={pending}
         onOpenChange={setBlockOpen}
-        onConfirm={confirmToggleBlock}
+        onConfirm={handleToggleBlock}
       />
-      <ResetTokensModal
-        business={selectedBusiness}
-        open={resetTokensOpen}
-        onOpenChange={setResetTokensOpen}
-        onConfirm={confirmResetTokens}
+      <CancelBillingModal
+        businessName={selectedBusiness?.name ?? null}
+        open={cancelOpen}
+        pending={pending}
+        onOpenChange={setCancelOpen}
+        onConfirm={handleCancelBilling}
+      />
+      <CreateBusinessModal
+        open={createOpen}
+        pending={createPending}
+        onOpenChange={setCreateOpen}
+        onConfirm={handleCreateBusiness}
       />
     </div>
   )

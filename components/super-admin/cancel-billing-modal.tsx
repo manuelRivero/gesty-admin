@@ -12,48 +12,46 @@ import {
 import { Button } from "@/components/ui/button"
 import { Loader2 } from "lucide-react"
 
-interface BlockModalProps {
+interface CancelBillingModalProps {
   businessName: string | null
-  isBlocked: boolean
   open: boolean
   pending?: boolean
   onOpenChange: (open: boolean) => void
   onConfirm: () => Promise<void> | void
 }
 
-export function BlockModal({
+export function CancelBillingModal({
   businessName,
-  isBlocked,
   open,
   pending = false,
   onOpenChange,
   onConfirm,
-}: BlockModalProps) {
+}: CancelBillingModalProps) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>
-            {isBlocked ? "Desbloquear IA" : "Bloquear IA"}
-          </AlertDialogTitle>
+          <AlertDialogTitle>Cancelar al fin del período</AlertDialogTitle>
           <AlertDialogDescription>
-            {isBlocked
-              ? `¿Seguro que querés desbloquear a ${businessName}? Se restaurará el acceso a la IA.`
-              : `¿Seguro que querés bloquear a ${businessName}? Se desactivará de inmediato el acceso a la IA.`}
+            Se programará la cancelación de {businessName} en Stripe
+            (cancel_at_period_end). El acceso sigue hasta que termine el período
+            actual.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={pending}>Cancelar</AlertDialogCancel>
-          <Button onClick={() => void onConfirm()} disabled={pending}>
+          <AlertDialogCancel disabled={pending}>Volver</AlertDialogCancel>
+          <Button
+            variant="destructive"
+            onClick={() => void onConfirm()}
+            disabled={pending}
+          >
             {pending ? (
               <>
                 <Loader2 className="size-4 animate-spin" />
-                Guardando…
+                Cancelando…
               </>
-            ) : isBlocked ? (
-              "Desbloquear"
             ) : (
-              "Bloquear"
+              "Confirmar cancelación"
             )}
           </Button>
         </AlertDialogFooter>

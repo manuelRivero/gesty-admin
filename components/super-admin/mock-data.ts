@@ -1,7 +1,30 @@
 import type { BusinessWithSubscription } from "./types"
 
+function item(
+  partial: Omit<
+    BusinessWithSubscription,
+    "has_subscription_row" | "access_ok" | "is_trial" | "trial_end"
+  > &
+    Partial<
+      Pick<
+        BusinessWithSubscription,
+        "has_subscription_row" | "access_ok" | "is_trial" | "trial_end"
+      >
+    >,
+): BusinessWithSubscription {
+  const status = partial.subscription.status.toLowerCase()
+  const isTrial = partial.is_trial ?? partial.subscription.plan_name === "Trial"
+  return {
+    has_subscription_row: partial.has_subscription_row ?? true,
+    access_ok: partial.access_ok ?? (!partial.ai_blocked && status !== "canceled"),
+    is_trial: isTrial,
+    trial_end: partial.trial_end ?? null,
+    ...partial,
+  }
+}
+
 export const mockBusinesses: BusinessWithSubscription[] = [
-  {
+  item({
     id: "bus_001",
     name: "Acme Restaurant",
     ai_blocked: false,
@@ -14,159 +37,35 @@ export const mockBusinesses: BusinessWithSubscription[] = [
       current_period_end: "2026-04-01T00:00:00Z",
       status: "active",
     },
-  },
-  {
+  }),
+  item({
     id: "bus_002",
     name: "Golden Dragon Bistro",
     ai_blocked: true,
     ai_monthly_tokens_used: 85000,
     ai_monthly_token_limit: 100000,
     created_at: "2024-02-20T14:15:00Z",
+    access_ok: false,
     subscription: {
       plan_name: "Pro",
       current_period_start: "2026-03-01T00:00:00Z",
       current_period_end: "2026-04-01T00:00:00Z",
       status: "active",
     },
-  },
-  {
+  }),
+  item({
     id: "bus_003",
     name: "Sunset Cafe",
     ai_blocked: false,
     ai_monthly_tokens_used: 12000,
     ai_monthly_token_limit: 50000,
     created_at: "2024-03-10T09:00:00Z",
+    access_ok: false,
     subscription: {
       plan_name: "Basic",
       current_period_start: "2026-01-15T00:00:00Z",
       current_period_end: "2026-02-15T00:00:00Z",
       status: "past_due",
     },
-  },
-  {
-    id: "bus_004",
-    name: "Metro Grill",
-    ai_blocked: false,
-    ai_monthly_tokens_used: 180000,
-    ai_monthly_token_limit: 250000,
-    created_at: "2024-04-05T11:45:00Z",
-    subscription: {
-      plan_name: "Business",
-      current_period_start: "2026-03-05T00:00:00Z",
-      current_period_end: "2026-04-05T00:00:00Z",
-      status: "active",
-    },
-  },
-  {
-    id: "bus_005",
-    name: "Coastal Kitchen",
-    ai_blocked: false,
-    ai_monthly_tokens_used: 32000,
-    ai_monthly_token_limit: 50000,
-    created_at: "2024-05-12T16:20:00Z",
-    subscription: {
-      plan_name: "Basic",
-      current_period_start: "2026-03-12T00:00:00Z",
-      current_period_end: "2026-04-12T00:00:00Z",
-      status: "active",
-    },
-  },
-  {
-    id: "bus_006",
-    name: "Urban Bites",
-    ai_blocked: false,
-    ai_monthly_tokens_used: 95000,
-    ai_monthly_token_limit: 100000,
-    created_at: "2024-06-18T08:30:00Z",
-    subscription: {
-      plan_name: "Pro",
-      current_period_start: "2026-03-18T00:00:00Z",
-      current_period_end: "2026-04-18T00:00:00Z",
-      status: "active",
-    },
-  },
-  {
-    id: "bus_007",
-    name: "Fresh & Fast Deli",
-    ai_blocked: false,
-    ai_monthly_tokens_used: 220000,
-    ai_monthly_token_limit: 250000,
-    created_at: "2024-07-22T13:00:00Z",
-    subscription: {
-      plan_name: "Business",
-      current_period_start: "2026-03-22T00:00:00Z",
-      current_period_end: "2026-04-22T00:00:00Z",
-      status: "active",
-    },
-  },
-  {
-    id: "bus_008",
-    name: "The Olive Branch",
-    ai_blocked: false,
-    ai_monthly_tokens_used: 8000,
-    ai_monthly_token_limit: 50000,
-    created_at: "2024-08-30T10:15:00Z",
-    subscription: {
-      plan_name: "Basic",
-      current_period_start: "2026-02-28T00:00:00Z",
-      current_period_end: "2026-03-28T00:00:00Z",
-      status: "active",
-    },
-  },
-  {
-    id: "bus_009",
-    name: "Sakura Sushi House",
-    ai_blocked: false,
-    ai_monthly_tokens_used: 67000,
-    ai_monthly_token_limit: 100000,
-    created_at: "2024-09-14T15:45:00Z",
-    subscription: {
-      plan_name: "Pro",
-      current_period_start: "2026-03-14T00:00:00Z",
-      current_period_end: "2026-04-14T00:00:00Z",
-      status: "active",
-    },
-  },
-  {
-    id: "bus_010",
-    name: "Mountain View Steakhouse",
-    ai_blocked: false,
-    ai_monthly_tokens_used: 145000,
-    ai_monthly_token_limit: 250000,
-    created_at: "2024-10-08T12:00:00Z",
-    subscription: {
-      plan_name: "Business",
-      current_period_start: "2026-03-08T00:00:00Z",
-      current_period_end: "2026-04-08T00:00:00Z",
-      status: "active",
-    },
-  },
-  {
-    id: "bus_011",
-    name: "La Cucina Italiana",
-    ai_blocked: false,
-    ai_monthly_tokens_used: 48000,
-    ai_monthly_token_limit: 50000,
-    created_at: "2024-11-20T09:30:00Z",
-    subscription: {
-      plan_name: "Basic",
-      current_period_start: "2026-03-20T00:00:00Z",
-      current_period_end: "2026-04-20T00:00:00Z",
-      status: "active",
-    },
-  },
-  {
-    id: "bus_012",
-    name: "Spice Route Indian",
-    ai_blocked: true,
-    ai_monthly_tokens_used: 100000,
-    ai_monthly_token_limit: 100000,
-    created_at: "2024-12-05T14:00:00Z",
-    subscription: {
-      plan_name: "Pro",
-      current_period_start: "2026-03-05T00:00:00Z",
-      current_period_end: "2026-04-05T00:00:00Z",
-      status: "active",
-    },
-  },
+  }),
 ]
