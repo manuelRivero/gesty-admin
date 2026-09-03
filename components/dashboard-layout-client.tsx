@@ -4,6 +4,7 @@ import { Toaster } from "sonner"
 
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
+import { BillingPaywallBanner } from "@/components/billing/paywall-banner"
 import { SuperAdminSidebar } from "@/components/super-admin/super-admin-sidebar"
 import { Header } from "@/components/header"
 import { AdminSocketProvider } from "@/contexts/admin-socket-context"
@@ -23,6 +24,7 @@ export function DashboardLayoutClient({
       <SidebarInset>
         <Toaster richColors closeButton position="top-right" />
         <Header />
+        {variant === "default" ? <BillingPaywallBanner /> : null}
         <main className="flex-1 overflow-auto p-4 md:p-6">{children}</main>
       </SidebarInset>
     </>

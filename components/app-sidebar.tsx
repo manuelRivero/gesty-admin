@@ -21,6 +21,7 @@ import {
   BadgePercent,
   Sparkles,
   Users,
+  Wallet,
 } from "lucide-react"
 
 import {
@@ -137,6 +138,12 @@ const navItems: {
     href: "/my-business",
     icon: Building2,
     allowedRoles: ["OWNER"],
+  },
+  {
+    title: "Facturación",
+    href: "/billing",
+    icon: Wallet,
+    allowedRoles: ["ADMIN", "OWNER"],
   },
   {
     title: "Configuración",
