@@ -1,6 +1,6 @@
 # Despliegue con Docker en DonWeb (Cloud Server)
 
-App **Next.js 16** dockerizada con build `standalone` y reverse proxy **Nginx Proxy Manager** (HTTPS vía panel en el puerto 81).
+App **gesty-admin** (Next.js 16) dockerizada con build `standalone` y reverse proxy **Nginx Proxy Manager** (HTTPS vía panel en el puerto 81).
 
 ## Requisitos en el VPS
 
@@ -19,7 +19,7 @@ sudo usermod -aG docker $USER   # reloguear después de esto
 
 ```bash
 # 1. Clonar el repo
-git clone <URL_DEL_REPO> app && cd app
+git clone <URL_DEL_REPO> gesty-admin && cd gesty-admin
 
 # 2. Crear el .env a partir del ejemplo y completar valores
 cp .env.example .env
@@ -37,7 +37,7 @@ docker compose logs -f app
 1. Abrí `http://TU_IP:81` e iniciá sesión (por defecto `admin@example.com` / `changeme`).
 2. **Hosts → Proxy Hosts → Add Proxy Host**
 3. **Domain Names:** valor de `DOMAIN` en tu `.env` (ej. `admin.tu-dominio.com`)
-4. **Forward Hostname / IP:** `app` (nombre del servicio en docker-compose)
+4. **Forward Hostname / IP:** `gesty-admin` (nombre del contenedor) o `app` (nombre del servicio)
 5. **Forward Port:** `3000`
 6. Activá **Block Common Exploits** y **Websockets Support** si usás sockets.
 7. En la pestaña **SSL**, solicitá un certificado Let's Encrypt.
@@ -104,11 +104,17 @@ set +a
 docker build \
   --build-arg NEXT_PUBLIC_API="${NEXT_PUBLIC_API}" \
   --build-arg NEXT_PUBLIC_SOCKET_URL="${NEXT_PUBLIC_SOCKET_URL}" \
-  -t food-service-core-admin:latest .
+  -t gesty-admin:latest .
 
-docker tag food-service-core-admin:latest "${DOCKER_IMAGE}"
+docker tag gesty-admin:latest "${DOCKER_IMAGE}"
 docker login
 docker push "${DOCKER_IMAGE}"
+```
+
+O con el script del repo:
+
+```bash
+./build-push.sh
 ```
 
 ### 2. En el VPS — solo imagen
@@ -119,7 +125,7 @@ Copiá al servidor únicamente estos archivos (no hace falta el código):
 - `.env`
 
 ```bash
-scp docker-compose.prod.yml .env root@TU_IP:/opt/apps/food-service-core-admin/
+scp docker-compose.prod.yml .env root@TU_IP:/opt/apps/gesty-admin/
 ```
 
 En el servidor, el `.env` debe tener al menos:
@@ -127,12 +133,12 @@ En el servidor, el `.env` debe tener al menos:
 ```env
 DOMAIN=admin.tu-dominio.com
 API=https://api.tu-dominio.com
-DOCKER_IMAGE=tuusuario/food-service-core-admin:latest
+DOCKER_IMAGE=tuusuario/gesty-admin:latest
 ```
 
 ```bash
 ssh root@TU_IP
-cd /opt/apps/food-service-core-admin
+cd /opt/apps/gesty-admin
 docker login
 docker compose -f docker-compose.prod.yml pull
 docker compose -f docker-compose.prod.yml up -d
@@ -141,7 +147,7 @@ docker compose -f docker-compose.prod.yml logs -f
 
 En NPM, creá el proxy host apuntando a:
 
-- **Forward Hostname / IP:** `127.0.0.1` (NPM en el host) o `app` si NPM está en la misma red Docker
+- **Forward Hostname / IP:** `gesty-admin` (misma red Docker) o `127.0.0.1` si NPM corre en el host
 - **Forward Port:** `3000`
 - **Domain Names:** el valor de `DOMAIN`
 
@@ -153,8 +159,8 @@ set -a && source .env && set +a
 docker build \
   --build-arg NEXT_PUBLIC_API="${NEXT_PUBLIC_API}" \
   --build-arg NEXT_PUBLIC_SOCKET_URL="${NEXT_PUBLIC_SOCKET_URL}" \
-  -t food-service-core-admin:latest .
-docker tag food-service-core-admin:latest "${DOCKER_IMAGE}"
+  -t gesty-admin:latest .
+docker tag gesty-admin:latest "${DOCKER_IMAGE}"
 docker push "${DOCKER_IMAGE}"
 
 # VPS

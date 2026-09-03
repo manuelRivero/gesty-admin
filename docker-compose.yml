@@ -6,6 +6,7 @@ services:
         NEXT_PUBLIC_API: ${NEXT_PUBLIC_API}
         NEXT_PUBLIC_SOCKET_URL: ${NEXT_PUBLIC_SOCKET_URL}
     image: ${DOCKER_IMAGE}
+    container_name: gesty-admin
     restart: unless-stopped
     environment:
       - NODE_ENV=production
