@@ -1,0 +1,37 @@
+---
+description: Mantener docs/FEATURES.md al trabajar cualquier funcionalidad nueva o cambio de producto ofrecible
+alwaysApply: true
+---
+
+# Catálogo de features (obligatorio)
+
+Cada vez que se **implemente, complete, deje parcial o proponga** una funcionalidad de producto en este repo, actualizar [`docs/FEATURES.md`](docs/FEATURES.md) en el mismo trabajo (no dejarlo “para después”).
+
+## Qué anotar
+
+- Features nuevas de UI/ops/WhatsApp/pagos/equipo/analytics/setup.
+- Cambios de estado: `propuesto` → `en desarrollo` → `parcial` → `disponible`.
+- Si pasa a ofrecible/remunerable para el local de experimento o clientes.
+
+## Qué no hace falta
+
+- Refactors internos sin valor para el local.
+- Fixes cosméticos o chores de tooling.
+- Cambios solo de docs de investigación (salvo que generen un ID nuevo en el catálogo).
+
+## Cómo anotar
+
+1. Reusar ID existente o crear uno (`OPS-xx`, `WA-xx`, `PAY-xx`, `TEAM-xx`, `SETUP-xx`, `AN-xx`, `PIPE-xx`).
+2. Completar: Estado, Ofrecible, Remunerable, valor en una frase, notas/ruta.
+3. Si hay plan de acción: vivirá en `docs/planes-accion/PLAN-ACCION-….md` y se linkea desde la fila.
+4. Agregar una línea al **Historial de actualizaciones** de `FEATURES.md`.
+
+## Planes de acción
+
+- Nuevos planes → solo en `docs/planes-accion/` (prefijo `PLAN-ACCION-`).
+- No dejar `PLAN-ACCION-*.md` en la raíz del repo.
+- Diseñados para poder copiarse a `gesty-backend` u otro repo.
+
+## Al terminar una feature “disponible”
+
+Antes de dar por cerrado el handoff: fila en `FEATURES.md` en `disponible`, con nota clara de si es `incluido` o `remunerable`.
