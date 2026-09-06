@@ -79,8 +79,8 @@ export function MenuItemsTable({
           </EmptyMedia>
           <EmptyTitle>No hay productos en el menú</EmptyTitle>
           <EmptyDescription>
-            Aún no se han agregado productos al menú. Crea el primer producto
-            para comenzar.
+            Aún no hay productos. Cargá al menos uno disponible antes de
+            habilitar pedidos en Configuración.
           </EmptyDescription>
         </EmptyHeader>
         <EmptyContent>

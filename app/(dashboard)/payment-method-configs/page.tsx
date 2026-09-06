@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { isAxiosError } from "axios"
-import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight } from "lucide-react"
+import { Plus, Pencil, Trash2, CreditCard, AlertCircle } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -66,13 +66,19 @@ import {
   fetchPaymentMethodConfigs,
   updatePaymentMethodConfig,
 } from "@/lib/requests/payment-method-configs"
-import { CreditCard } from "lucide-react"
 import {
   getPaymentMethodLabel,
   isValidPaymentMethodId,
   PAYMENT_METHOD_OPTIONS,
   type PaymentMethodId,
 } from "@/lib/constants/paymentMethods"
+import { OrdersSetupNextSteps } from "@/components/orders-setup/orders-setup-next-steps"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import {
+  fetchOrdersSetupPrerequisites,
+  type OrdersSetupStatus,
+} from "@/lib/orders-setup"
+import { fetchAdminBusinessConfig } from "@/lib/requests/business-config"
 
 const ALL_METHODS_CONFIGURED_MESSAGE = "Ya configuraste todos los métodos de pago"
 const PAYMENT_METHOD_ALREADY_CONFIGURED_MESSAGE =
@@ -152,12 +158,30 @@ export default function PaymentMethodConfigsPage() {
   const [deleteTarget, setDeleteTarget] = useState<AdminPaymentMethodConfig | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [togglingId, setTogglingId] = useState<string | null>(null)
+  const [setupStatus, setSetupStatus] = useState<OrdersSetupStatus | null>(null)
+  const [showSetupCta, setShowSetupCta] = useState(false)
+
+  const refreshSetupStatus = useCallback(async () => {
+    try {
+      const config = await fetchAdminBusinessConfig()
+      const status = await fetchOrdersSetupPrerequisites({
+        orders_enabled: config.orders_enabled,
+        delivery_enabled: config.delivery_enabled,
+        takeaway_enabled: config.takeaway_enabled,
+        external_delivery_enabled: config.external_delivery_enabled,
+      })
+      setSetupStatus(status)
+    } catch {
+      setSetupStatus(null)
+    }
+  }, [])
 
   const loadConfigs = useCallback(async () => {
     setIsLoading(true)
     try {
       const data = await fetchPaymentMethodConfigs()
       setConfigs(data)
+      void refreshSetupStatus()
     } catch (e) {
       const msg = isAxiosError(e)
         ? (e.response?.data as { message?: string; error?: string })?.message ??
@@ -168,7 +192,7 @@ export default function PaymentMethodConfigsPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [refreshSetupStatus])
 
   useEffect(() => {
     void loadConfigs()
@@ -183,6 +207,11 @@ export default function PaymentMethodConfigsPage() {
   const paymentMethodSelectOptions = isEditMode
     ? PAYMENT_METHOD_OPTIONS.filter((opt) => opt.value === form.paymentMethod)
     : availablePaymentMethodOptions
+  const hasActiveMethod = configs.some((c) => c.isActive)
+  const onlineActiveWithoutOffer =
+    configs.some((c) => c.paymentMethod === "online" && c.isActive) &&
+    setupStatus != null &&
+    !setupStatus.hasOfferablePayment
 
   const openCreate = () => {
     if (!canCreateMore) return
@@ -252,6 +281,10 @@ export default function PaymentMethodConfigsPage() {
         const updated = await updatePaymentMethodConfig(editingConfig.id, payload)
         setConfigs((prev) => prev.map((c) => (c.id === updated.id ? updated : c)))
         toast.success("Configuración actualizada")
+        if (updated.isActive) {
+          setShowSetupCta(true)
+          void refreshSetupStatus()
+        }
       } else {
         const payload: CreatePaymentMethodConfigPayload = {
           paymentMethod,
@@ -266,6 +299,10 @@ export default function PaymentMethodConfigsPage() {
         const created = await createPaymentMethodConfig(payload)
         setConfigs((prev) => [...prev, created])
         toast.success("Configuración creada")
+        if (created.isActive) {
+          setShowSetupCta(true)
+          void refreshSetupStatus()
+        }
       }
       setDialogOpen(false)
     } catch (e) {
@@ -329,6 +366,11 @@ export default function PaymentMethodConfigsPage() {
         isActive: !config.isActive,
       })
       setConfigs((prev) => prev.map((c) => (c.id === updated.id ? updated : c)))
+      if (updated.isActive) {
+        setShowSetupCta(true)
+        void refreshSetupStatus()
+        toast.success("Método activado. Los pedidos no se habilitan solos.")
+      }
     } catch (e) {
       const msg = isAxiosError(e)
         ? (e.response?.data as { message?: string })?.message ?? e.message
@@ -372,98 +414,136 @@ export default function PaymentMethodConfigsPage() {
 
       {isLoading ? (
         <PaymentMethodConfigsSkeleton />
-      ) : configs.length === 0 ? (
-        <Empty className="border">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <CreditCard />
-            </EmptyMedia>
-            <EmptyTitle>Sin ajustes configurados</EmptyTitle>
-            <EmptyDescription>
-              Agrega un ajuste para aplicar descuentos o recargos según el método de pago.
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
       ) : (
-        <div className="flex flex-col gap-3">
-          {configs.map((config) => (
-            <Card key={config.id} className={config.isActive ? "" : "opacity-60"}>
-              <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pt-4 pb-4">
-                <div className="flex flex-col gap-1 min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium">{config.label}</span>
-                    <Badge variant="outline" className="text-xs">
-                      {getPaymentMethodLabel(config.paymentMethod)}
-                    </Badge>
-                    <Badge
-                      variant={config.isSurcharge ? "destructive" : "secondary"}
-                      className={
-                        config.isSurcharge
-                          ? ""
-                          : "text-green-700 dark:text-green-400"
-                      }
-                    >
-                      {config.isSurcharge ? "Recargo" : "Descuento"}
-                    </Badge>
-                    {!config.isActive && (
-                      <Badge variant="secondary">Inactivo</Badge>
-                    )}
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    {config.adjustmentType === "PERCENT" ? "Porcentaje" : "Monto fijo"}{" "}
-                    ·{" "}
-                    <span className="font-medium tabular-nums">
-                      {formatAdjustment(config)}
-                    </span>
-                  </p>
-                  {isTransferMethod(config.paymentMethod) &&
-                    (config.bankAlias || config.bankCbu || config.bankHolder) && (
-                      <p className="text-xs text-muted-foreground truncate">
-                        {[
-                          config.bankAlias ? `Alias: ${config.bankAlias}` : null,
-                          config.bankCbu ? `CBU: ${config.bankCbu}` : null,
-                          config.bankHolder ? config.bankHolder : null,
-                        ]
-                          .filter(Boolean)
-                          .join(" · ")}
+        <>
+          <div className="flex flex-col gap-4">
+          {!hasActiveMethod ? (
+            <Alert className="border-amber-500/40 bg-amber-500/5">
+              <AlertCircle className="text-amber-600" />
+              <AlertTitle>Ningún método activo</AlertTitle>
+              <AlertDescription>
+                Activá al menos uno antes de vender. Pago online sin Mercado Pago
+                no cuenta como ofrecible. Activar un método no habilita pedidos.
+              </AlertDescription>
+            </Alert>
+          ) : null}
+
+          {(showSetupCta || hasActiveMethod) &&
+          setupStatus &&
+          !setupStatus.isReadyToSell ? (
+            <OrdersSetupNextSteps
+              status={setupStatus}
+              onlineNeedsProvider={onlineActiveWithoutOffer}
+            />
+          ) : null}
+
+          {configs.length === 0 ? (
+            <Empty className="border">
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <CreditCard />
+                </EmptyMedia>
+                <EmptyTitle>Sin ajustes configurados</EmptyTitle>
+                <EmptyDescription>
+                  Agrega un ajuste para aplicar descuentos o recargos según el
+                  método de pago.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {configs.map((config) => (
+                <Card
+                  key={config.id}
+                  className={config.isActive ? "" : "opacity-60"}
+                >
+                  <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pt-4 pb-4">
+                    <div className="flex flex-col gap-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium">{config.label}</span>
+                        <Badge variant="outline" className="text-xs">
+                          {getPaymentMethodLabel(config.paymentMethod)}
+                        </Badge>
+                        <Badge
+                          variant={
+                            config.isSurcharge ? "destructive" : "secondary"
+                          }
+                          className={
+                            config.isSurcharge
+                              ? ""
+                              : "text-green-700 dark:text-green-400"
+                          }
+                        >
+                          {config.isSurcharge ? "Recargo" : "Descuento"}
+                        </Badge>
+                        {!config.isActive && (
+                          <Badge variant="secondary">Inactivo</Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {config.adjustmentType === "PERCENT"
+                          ? "Porcentaje"
+                          : "Monto fijo"}{" "}
+                        ·{" "}
+                        <span className="font-medium tabular-nums">
+                          {formatAdjustment(config)}
+                        </span>
                       </p>
-                    )}
-                  {config.instructions && (
-                    <p className="text-xs text-muted-foreground line-clamp-2">
-                      {config.instructions}
-                    </p>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <Switch
-                    checked={config.isActive}
-                    onCheckedChange={() => void handleToggleActive(config)}
-                    disabled={togglingId === config.id}
-                    aria-label={config.isActive ? "Desactivar" : "Activar"}
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-8"
-                    onClick={() => openEdit(config)}
-                  >
-                    <Pencil className="size-4" />
-                    <span className="sr-only">Editar</span>
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-8 text-destructive hover:text-destructive"
-                    onClick={() => setDeleteTarget(config)}
-                  >
-                    <Trash2 className="size-4" />
-                    <span className="sr-only">Eliminar</span>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                      {isTransferMethod(config.paymentMethod) &&
+                        (config.bankAlias ||
+                          config.bankCbu ||
+                          config.bankHolder) && (
+                          <p className="text-xs text-muted-foreground truncate">
+                            {[
+                              config.bankAlias
+                                ? `Alias: ${config.bankAlias}`
+                                : null,
+                              config.bankCbu ? `CBU: ${config.bankCbu}` : null,
+                              config.bankHolder ? config.bankHolder : null,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </p>
+                        )}
+                      {config.instructions && (
+                        <p className="text-xs text-muted-foreground line-clamp-2">
+                          {config.instructions}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Switch
+                        checked={config.isActive}
+                        onCheckedChange={() => void handleToggleActive(config)}
+                        disabled={togglingId === config.id}
+                        aria-label={config.isActive ? "Desactivar" : "Activar"}
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-8"
+                        onClick={() => openEdit(config)}
+                      >
+                        <Pencil className="size-4" />
+                        <span className="sr-only">Editar</span>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-8 text-destructive hover:text-destructive"
+                        onClick={() => setDeleteTarget(config)}
+                      >
+                        <Trash2 className="size-4" />
+                        <span className="sr-only">Eliminar</span>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+          </div>
+        </>
       )}
 
       {/* Create / Edit dialog */}

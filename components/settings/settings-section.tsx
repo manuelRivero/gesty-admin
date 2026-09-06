@@ -9,18 +9,20 @@ import {
 } from "@/components/ui/card"
 
 interface SettingsSectionProps {
+  id?: string
   title: string
   description?: string
   children: React.ReactNode
 }
 
 export function SettingsSection({
+  id,
   title,
   description,
   children,
 }: SettingsSectionProps) {
   return (
-    <Card>
+    <Card id={id}>
       <CardHeader>
         <CardTitle>{title}</CardTitle>
         {description && <CardDescription>{description}</CardDescription>}

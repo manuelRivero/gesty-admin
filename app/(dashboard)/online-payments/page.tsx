@@ -84,9 +84,9 @@ export default function OnlinePaymentsPage() {
           <AlertCircle className="text-amber-600" />
           <AlertTitle>Ningún método activo</AlertTitle>
           <AlertDescription>
-            Para cobrar online necesitás configurar al menos un proveedor y
-            dejarlo activo. Elegí un método y tocá &quot;Configurar&quot; para
-            ingresar tus credenciales.
+            Activá al menos un proveedor antes de vender online. El método
+            &quot;Pago online&quot; en ajustes de pago no cuenta sin Mercado Pago
+            activo. Esto no habilita pedidos automáticamente.
           </AlertDescription>
         </Alert>
       ) : null}

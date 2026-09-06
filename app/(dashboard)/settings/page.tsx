@@ -1,19 +1,25 @@
 "use client"
 
 import { useState, useEffect, useMemo, useCallback } from "react"
-import { isAxiosError } from "axios"
 import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
 
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { BotPersonalitySelector } from "@/components/settings/bot-personality-selector"
+import { OrdersSetupChecklist } from "@/components/settings/orders-setup-checklist"
 import { SettingsFormFooter, SETTINGS_UNSAVED_MESSAGE } from "@/components/settings/settings-form-footer"
 import { SettingsSection } from "@/components/settings/settings-section"
 import { ToggleField } from "@/components/settings/toggle-field"
 import { NumberInputField } from "@/components/settings/number-input-field"
 import {
+  fetchOrdersSetupPrerequisites,
+  hasFulfillmentCapability,
+  type OrdersSetupStatus,
+} from "@/lib/orders-setup"
+import {
   fetchAdminBusinessConfig,
+  getBusinessConfigApiErrorMessage,
   patchAdminBusinessConfig,
   resetAdminBusinessConfig,
   type AdminBusinessConfig,
@@ -23,7 +29,11 @@ import { useUnsavedChangesToast } from "@/hooks/use-unsaved-changes-toast"
 
 type SettingsData = AdminBusinessConfig
 
-const PATCH_EXCLUDED_KEYS = new Set<keyof SettingsData>(["bot_personality"])
+/** `checkout_enabled` sigue a `orders_enabled` en backend; no se edita en UI. */
+const PATCH_EXCLUDED_KEYS = new Set<keyof SettingsData>([
+  "bot_personality",
+  "checkout_enabled",
+])
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<SettingsData | null>(null)
@@ -31,6 +41,25 @@ export default function SettingsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [isResetting, setIsResetting] = useState(false)
+  const [setupStatus, setSetupStatus] = useState<OrdersSetupStatus | null>(null)
+  const [isSetupLoading, setIsSetupLoading] = useState(true)
+
+  const refreshSetupStatus = useCallback(async (config: SettingsData) => {
+    setIsSetupLoading(true)
+    try {
+      const status = await fetchOrdersSetupPrerequisites({
+        orders_enabled: config.orders_enabled,
+        delivery_enabled: config.delivery_enabled,
+        takeaway_enabled: config.takeaway_enabled,
+        external_delivery_enabled: config.external_delivery_enabled,
+      })
+      setSetupStatus(status)
+    } catch {
+      setSetupStatus(null)
+    } finally {
+      setIsSetupLoading(false)
+    }
+  }, [])
 
   const loadConfig = useCallback(async () => {
     setIsLoading(true)
@@ -38,21 +67,29 @@ export default function SettingsPage() {
       const data = await fetchAdminBusinessConfig()
       setSettings(data)
       setInitialSettings(data)
+      void refreshSetupStatus(data)
     } catch (e) {
-      const message = isAxiosError(e)
-        ? (e.response?.data as { message?: string; error?: string })?.message ??
-          (e.response?.data as { message?: string; error?: string })?.error ??
-          e.message
-        : "No se pudo cargar la configuración."
-      toast.error(typeof message === "string" && message ? message : "No se pudo cargar la configuración.")
+      toast.error(
+        getBusinessConfigApiErrorMessage(e, "No se pudo cargar la configuración."),
+      )
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [refreshSetupStatus])
 
   useEffect(() => {
     void loadConfig()
   }, [loadConfig])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const hash = window.location.hash.replace("#", "")
+    if (!hash) return
+    const el = document.getElementById(hash)
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" })
+    }
+  }, [settings])
 
   const updateSetting = <K extends keyof SettingsData>(
     key: K,
@@ -72,6 +109,29 @@ export default function SettingsPage() {
   }, [settings, initialSettings])
 
   const isDirty = Object.keys(patchPayload).length > 0
+
+  const checklistStatus = useMemo<OrdersSetupStatus | null>(() => {
+    if (!settings || !setupStatus) return setupStatus
+    const hasFulfillment = hasFulfillmentCapability(settings)
+    const canEnableOrders =
+      setupStatus.hasActiveMenu &&
+      hasFulfillment &&
+      setupStatus.hasOfferablePayment
+    return {
+      ...setupStatus,
+      hasFulfillment,
+      ordersEnabled: settings.orders_enabled,
+      canEnableOrders,
+      isReadyToSell: canEnableOrders && settings.orders_enabled,
+      steps: setupStatus.steps.map((step) => {
+        if (step.id === "fulfillment") return { ...step, done: hasFulfillment }
+        if (step.id === "orders") {
+          return { ...step, done: settings.orders_enabled }
+        }
+        return step
+      }),
+    }
+  }, [settings, setupStatus])
 
   useUnsavedChangesToast(isDirty, SETTINGS_UNSAVED_MESSAGE)
 
@@ -117,13 +177,13 @@ export default function SettingsPage() {
       return false
     }
 
+    // Fulfillment solo obligatorio al habilitar pedidos (I1 / I3).
     if (
-      !settings.delivery_enabled &&
-      !settings.takeaway_enabled &&
-      !settings.external_delivery_enabled
+      settings.orders_enabled &&
+      !hasFulfillmentCapability(settings)
     ) {
       toast.error(
-        "Dejá al menos una opción activa: envío propio, delivery externo o retiro en local.",
+        "Para habilitar pedidos necesitás al menos un modo de entrega: envío propio, delivery externo o retiro en local.",
       )
       return false
     }
@@ -144,14 +204,10 @@ export default function SettingsPage() {
       const updated = await patchAdminBusinessConfig(patchPayload)
       setSettings(updated)
       setInitialSettings(updated)
+      void refreshSetupStatus(updated)
       toast.success("Configuración guardada correctamente")
     } catch (e) {
-      const message = isAxiosError(e)
-        ? (e.response?.data as { message?: string; error?: string })?.message ??
-          (e.response?.data as { message?: string; error?: string })?.error ??
-          e.message
-        : "Error al guardar la configuración"
-      toast.error(typeof message === "string" && message ? message : "Error al guardar la configuración")
+      toast.error(getBusinessConfigApiErrorMessage(e))
     } finally {
       setIsSaving(false)
     }
@@ -170,14 +226,15 @@ export default function SettingsPage() {
       const refreshed = await fetchAdminBusinessConfig()
       setSettings(refreshed)
       setInitialSettings(refreshed)
+      void refreshSetupStatus(refreshed)
       toast.success("Configuración restaurada a valores por defecto")
     } catch (e) {
-      const message = isAxiosError(e)
-        ? (e.response?.data as { message?: string; error?: string })?.message ??
-          (e.response?.data as { message?: string; error?: string })?.error ??
-          e.message
-        : "No se pudo restaurar la configuración por defecto."
-      toast.error(typeof message === "string" && message ? message : "No se pudo restaurar la configuración por defecto.")
+      toast.error(
+        getBusinessConfigApiErrorMessage(
+          e,
+          "No se pudo restaurar la configuración por defecto.",
+        ),
+      )
     } finally {
       setIsResetting(false)
     }
@@ -343,53 +400,57 @@ export default function SettingsPage() {
           />
         </SettingsSection>
 
-        {/* Pedidos: switches de pedidos/checkout comentados temporalmente
+        {/* Pedidos: un solo control visual (orders_enabled). checkout_enabled sigue al backend. */}
         <SettingsSection
+          id="pedidos"
           title="Pedidos"
-          description="Configura las opciones de pedidos"
+          description="El bot no toma pedidos hasta que habilites esta opción. Completá el checklist antes."
         >
+          <OrdersSetupChecklist
+            status={checklistStatus}
+            isLoading={isSetupLoading}
+          />
           <ToggleField
             id="orders-enabled"
-            label="Habilitar Pedidos"
-            description="Permitir que los clientes realicen pedidos"
+            label="Habilitar pedidos"
+            description={
+              checklistStatus &&
+              !checklistStatus.hasActiveMenu &&
+              !settings.orders_enabled
+                ? "Falta menú con al menos un producto disponible"
+                : checklistStatus &&
+                    !checklistStatus.hasOfferablePayment &&
+                    !settings.orders_enabled
+                  ? "Falta al menos un método de pago ofrecible"
+                  : !hasFulfillmentCapability(settings) &&
+                      !settings.orders_enabled
+                    ? "Elegí delivery y/o retiro en local en la sección de abajo"
+                    : "Permitir que los clientes realicen pedidos por el bot"
+            }
             checked={settings.orders_enabled}
             onCheckedChange={(checked) =>
               updateSetting("orders_enabled", checked)
             }
           />
-          <ToggleField
-            id="checkout-enabled"
-            label="Habilitar Checkout"
-            description="Permitir pagos en línea"
-            checked={settings.checkout_enabled}
-            onCheckedChange={(checked) =>
-              updateSetting("checkout_enabled", checked)
-            }
-            disabled={!settings.orders_enabled}
-          />
         </SettingsSection>
-        */}
 
         <SettingsSection
+          id="entrega"
           title="Entrega y retiro"
-          description="Al menos una opción debe estar activa. Envío propio y delivery externo son excluyentes."
+          description="Elegí al menos una opción antes de vender. Envío propio y delivery externo son excluyentes. Podés dejar todo apagado mientras configurás el local."
         >
+          {!hasFulfillmentCapability(settings) ? (
+            <p className="rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-sm text-amber-900 dark:text-amber-200">
+              Todavía no hay fulfillment activo. Activá envío propio, delivery
+              externo o retiro en local para poder habilitar pedidos.
+            </p>
+          ) : null}
           <ToggleField
             id="delivery-enabled"
             label="Envío a domicilio (propio)"
             description="Delivery con flota o logística propia del local"
             checked={settings.delivery_enabled}
             onCheckedChange={(checked) => {
-              if (
-                !checked &&
-                !settings.takeaway_enabled &&
-                !settings.external_delivery_enabled
-              ) {
-                toast.error(
-                  "No podés dejar todo apagado: habilitá delivery externo o retiro en local.",
-                )
-                return
-              }
               updateSetting("delivery_enabled", checked)
               if (checked && settings.external_delivery_enabled) {
                 updateSetting("external_delivery_enabled", false)
@@ -402,16 +463,6 @@ export default function SettingsPage() {
             description="Usá flota externa. Desactiva el envío propio y habilita la calibración de tarifas en Zonas de envío."
             checked={settings.external_delivery_enabled}
             onCheckedChange={(checked) => {
-              if (
-                !checked &&
-                !settings.takeaway_enabled &&
-                !settings.delivery_enabled
-              ) {
-                toast.error(
-                  "No podés dejar todo apagado: habilitá envío propio o retiro en local.",
-                )
-                return
-              }
               updateSetting("external_delivery_enabled", checked)
               if (checked && settings.delivery_enabled) {
                 updateSetting("delivery_enabled", false)
@@ -423,19 +474,9 @@ export default function SettingsPage() {
             label="Retiro en local"
             description="Permitir que el cliente retire el pedido en el local"
             checked={settings.takeaway_enabled}
-            onCheckedChange={(checked) => {
-              if (
-                !checked &&
-                !settings.delivery_enabled &&
-                !settings.external_delivery_enabled
-              ) {
-                toast.error(
-                  "No podés dejar todo apagado: habilitá envío propio o delivery externo.",
-                )
-                return
-              }
+            onCheckedChange={(checked) =>
               updateSetting("takeaway_enabled", checked)
-            }}
+            }
           />
           <div className="flex flex-col gap-2">
             <Label
@@ -496,7 +537,7 @@ export default function SettingsPage() {
         {/* Reservations */}
         <SettingsSection
           title="Reservaciones"
-          description="Configura las opciones de reservaciones"
+          description="Independiente de pedidos: podés tomar reservas sin vender online."
         >
           <ToggleField
             id="reservations-enabled"

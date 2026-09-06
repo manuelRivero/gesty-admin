@@ -12,6 +12,7 @@ import {
   getProviderDisplayName,
 } from "@/components/online-payments/provider-brand"
 import { SecretInputField } from "@/components/online-payments/secret-input-field"
+import { OrdersSetupNextSteps } from "@/components/orders-setup/orders-setup-next-steps"
 import { SettingsSection } from "@/components/settings/settings-section"
 import { ToggleField } from "@/components/settings/toggle-field"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -19,6 +20,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
+import { fetchAdminBusinessConfig } from "@/lib/requests/business-config"
 import {
   createAdminPaymentProvider,
   fetchAdminPaymentProviders,
@@ -26,6 +28,10 @@ import {
   type AdminPaymentProvider,
   type PaymentProviderId,
 } from "@/lib/requests/payment-providers"
+import {
+  fetchOrdersSetupPrerequisites,
+  type OrdersSetupStatus,
+} from "@/lib/orders-setup"
 
 function errorMessage(err: unknown, fallback: string): string {
   if (!isAxiosError(err)) return fallback
@@ -62,6 +68,8 @@ export default function ConfigurePaymentProviderPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [notFound, setNotFound] = useState(false)
+  const [setupStatus, setSetupStatus] = useState<OrdersSetupStatus | null>(null)
+  const [showSetupCta, setShowSetupCta] = useState(false)
 
   const displayName = useMemo(
     () => getProviderDisplayName(providerId, providerName ?? undefined),
@@ -69,6 +77,21 @@ export default function ConfigurePaymentProviderPage() {
   )
 
   const isEditing = Boolean(configured)
+
+  const refreshSetupStatus = useCallback(async () => {
+    try {
+      const config = await fetchAdminBusinessConfig()
+      const status = await fetchOrdersSetupPrerequisites({
+        orders_enabled: config.orders_enabled,
+        delivery_enabled: config.delivery_enabled,
+        takeaway_enabled: config.takeaway_enabled,
+        external_delivery_enabled: config.external_delivery_enabled,
+      })
+      setSetupStatus(status)
+    } catch {
+      setSetupStatus(null)
+    }
+  }, [])
 
   const loadData = useCallback(async () => {
     setIsLoading(true)
@@ -187,6 +210,13 @@ export default function ConfigurePaymentProviderPage() {
 
       setSaveSuccess(true)
       toast.success("Configuración guardada correctamente")
+      if (form.isActive) {
+        setShowSetupCta(true)
+        void refreshSetupStatus()
+        toast.message("Los pedidos no se habilitan solos", {
+          description: "Completá el setup en Configuración cuando estés listo.",
+        })
+      }
     } catch (err) {
       toast.error(errorMessage(err, "No se pudo guardar la configuración."))
     } finally {
@@ -247,6 +277,8 @@ export default function ConfigurePaymentProviderPage() {
             </p>
           </div>
         </div>
+
+        {showSetupCta ? <OrdersSetupNextSteps status={setupStatus} /> : null}
       </div>
 
       {saveSuccess ? (

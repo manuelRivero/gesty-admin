@@ -1,6 +1,41 @@
+import { isAxiosError } from "axios"
+
 import { api } from "@/lib/api"
 
 export const ADMIN_BUSINESS_CONFIG_PATH = "/admin/config"
+
+/** Códigos estables del backend al habilitar pedidos sin prerequisitos. */
+export const ORDERS_REQUIRES_MENU = "ORDERS_REQUIRES_MENU"
+export const ORDERS_REQUIRES_PAYMENT = "ORDERS_REQUIRES_PAYMENT"
+export const ORDERS_REQUIRES_FULFILLMENT = "ORDERS_REQUIRES_FULFILLMENT"
+
+const ORDERS_REQUIREMENT_MESSAGES: Record<string, string> = {
+  [ORDERS_REQUIRES_MENU]:
+    "Para habilitar pedidos necesitás al menos un ítem de menú disponible.",
+  [ORDERS_REQUIRES_PAYMENT]:
+    "Para habilitar pedidos necesitás al menos un método de pago ofrecible (activo). Si solo tenés pago online, configurá Mercado Pago.",
+  [ORDERS_REQUIRES_FULFILLMENT]:
+    "Para habilitar pedidos necesitás al menos un modo de entrega: envío propio, delivery externo o retiro en local.",
+}
+
+/**
+ * Mensajes amigables para PATCH/POST de config (incluye codes ORDERS_REQUIRES_*).
+ */
+export function getBusinessConfigApiErrorMessage(
+  err: unknown,
+  fallback = "Error al guardar la configuración",
+): string {
+  if (!isAxiosError(err)) return fallback
+  const data = err.response?.data as
+    | { code?: string; message?: string; error?: string }
+    | undefined
+  const code = typeof data?.code === "string" ? data.code : undefined
+  if (code && ORDERS_REQUIREMENT_MESSAGES[code]) {
+    return ORDERS_REQUIREMENT_MESSAGES[code]
+  }
+  const message = data?.error ?? data?.message ?? err.message
+  return typeof message === "string" && message ? message : fallback
+}
 
 export type BotPersonalitySlug = "neutral" | "friendly" | "elegant"
 
@@ -58,9 +93,13 @@ export type AdminBusinessConfigPatch = Partial<AdminBusinessConfig>
 function normalizeAdminBusinessConfig(data: AdminBusinessConfig): AdminBusinessConfig {
   return {
     ...data,
-    delivery_enabled: data.delivery_enabled ?? true,
+    // Defaults alineados a create limpio (capacidades off).
+    orders_enabled: data.orders_enabled ?? false,
+    checkout_enabled: data.checkout_enabled ?? false,
+    delivery_enabled: data.delivery_enabled ?? false,
     takeaway_enabled: data.takeaway_enabled ?? false,
     external_delivery_enabled: data.external_delivery_enabled ?? false,
+    reservations_enabled: data.reservations_enabled ?? false,
     pickup_instructions: data.pickup_instructions ?? null,
     humanize_messages: data.humanize_messages ?? false,
     bot_personality_id: data.bot_personality_id ?? "",
