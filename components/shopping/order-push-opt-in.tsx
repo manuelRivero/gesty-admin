@@ -23,8 +23,8 @@ type OrderPushOptInProps = {
 function pushHintForFulfillment(fulfillmentType?: string | null): string {
   const delivery = fulfillmentType?.trim().toUpperCase() === "DELIVERY"
   return delivery
-    ? "Te avisamos cuando el pedido salga en camino (aunque cierres esta página)."
-    : "Te avisamos cuando esté listo para retirar (aunque cierres esta página)."
+    ? "Te avisamos en cada avance (preparación, en camino y entrega)."
+    : "Te avisamos en cada avance (preparación, listo para retirar y entrega)."
 }
 
 export function OrderPushOptIn({
