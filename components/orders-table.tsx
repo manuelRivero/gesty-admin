@@ -268,8 +268,11 @@ export function OrdersTable({
             <TableBody>
               {orders.map((order) => {
                 const isNew = highlightOrderIds.includes(order.id)
-                const nextPatchStatus = getNextPatchableOrderStatus(order.status)
                 const isDelivery = orderIsDeliveryFulfillment(order)
+                const nextPatchStatus = getNextPatchableOrderStatus(
+                  order.status,
+                  isDelivery,
+                )
                 return (
                   <TableRow
                     key={order.id}
@@ -681,9 +684,12 @@ export function OrdersTable({
               />
 
               {(() => {
-                const next = getNextPatchableOrderStatus(selectedOrder.status)
-                if (!next) return null
                 const isDelivery = orderIsDeliveryFulfillment(selectedOrder)
+                const next = getNextPatchableOrderStatus(
+                  selectedOrder.status,
+                  isDelivery,
+                )
+                if (!next) return null
                 return (
                   <>
                     <Separator />
