@@ -54,7 +54,24 @@ export function writeStorefrontPushOptIn(
 }
 
 export async function ensureStorefrontServiceWorker(): Promise<ServiceWorkerRegistration> {
-  return navigator.serviceWorker.register(STOREFRONT_SW_PATH, { scope: "/" })
+  try {
+    const registration = await navigator.serviceWorker.register(
+      STOREFRONT_SW_PATH,
+      { scope: "/" },
+    )
+    await navigator.serviceWorker.ready
+    return registration
+  } catch (err) {
+    const detail =
+      err instanceof Error && err.message.trim()
+        ? err.message.trim()
+        : "registro fallido"
+    throw new PublicOrderPushError(
+      `No se pudo registrar el service worker (${detail})`,
+      "SW_REGISTER_FAILED",
+      500,
+    )
+  }
 }
 
 function toSubscriptionInput(
@@ -78,9 +95,17 @@ function toSubscriptionInput(
   }
 }
 
+function applicationServerKeyFromVapid(publicKey: string): BufferSource {
+  const bytes = urlBase64ToUint8Array(publicKey.trim())
+  // Chrome Android a veces rechaza vistas tipadas “raras”; pasar ArrayBuffer puro.
+  return bytes.buffer.slice(
+    bytes.byteOffset,
+    bytes.byteOffset + bytes.byteLength,
+  ) as ArrayBuffer
+}
+
 /**
  * Permiso + SW + subscribe + POST al backend.
- * Lanza `PublicOrderPushError` o Error genérico.
  */
 export async function subscribeStorefrontOrderPush(
   slug: string,
@@ -105,17 +130,26 @@ export async function subscribeStorefrontOrderPush(
 
   const publicKey = await fetchVapidPublicKey()
   const registration = await ensureStorefrontServiceWorker()
-  await navigator.serviceWorker.ready
 
-  const existing = await registration.pushManager.getSubscription()
-  const subscription =
-    existing ??
-    (await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(
-        publicKey,
-      ) as BufferSource,
-    }))
+  let subscription = await registration.pushManager.getSubscription()
+  if (!subscription) {
+    try {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: applicationServerKeyFromVapid(publicKey),
+      })
+    } catch (err) {
+      const detail =
+        err instanceof Error && err.message.trim()
+          ? err.message.trim()
+          : "subscribe falló"
+      throw new PublicOrderPushError(
+        `No se pudo suscribir al push (${detail})`,
+        "SUBSCRIBE_FAILED",
+        500,
+      )
+    }
+  }
 
   await registerOrderPushSubscription(
     slug,

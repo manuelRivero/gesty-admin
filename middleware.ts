@@ -57,6 +57,7 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!api/|_next/|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    // Excluir estáticos + SW de push (si no, /sw-storefront.js → /login y falla el registro).
+    "/((?!api/|_next/|favicon.ico|sw-storefront\\.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 }

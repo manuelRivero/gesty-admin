@@ -99,15 +99,24 @@ export async function unregisterOrderPushSubscription(
 }
 
 function mapPushAxiosError(error: unknown): never {
-  if (isAxiosError(error) && error.response) {
-    const data = error.response.data as {
-      error?: string
-      code?: string
+  if (isAxiosError(error)) {
+    if (error.response) {
+      const data = error.response.data as {
+        error?: string
+        code?: string
+      }
+      throw new PublicOrderPushError(
+        typeof data?.error === "string"
+          ? data.error
+          : "No se pudo registrar el aviso",
+        typeof data?.code === "string" ? data.code : "UNKNOWN",
+        error.response.status,
+      )
     }
     throw new PublicOrderPushError(
-      typeof data?.error === "string" ? data.error : "No se pudo registrar el aviso",
-      typeof data?.code === "string" ? data.code : "UNKNOWN",
-      error.response.status,
+      "Sin conexión con el servidor de avisos",
+      "NETWORK",
+      0,
     )
   }
   throw error

@@ -90,9 +90,15 @@ export function OrderPushOptIn({
           )
         } else if (err.code === "ORDER_TERMINAL" || err.httpStatus === 409) {
           setError("Este pedido ya terminó; no hace falta avisar.")
+        } else if (err.code === "SW_REGISTER_FAILED") {
+          setError(
+            "No se pudo preparar el aviso en este dispositivo. Recargá la página e intentá de nuevo.",
+          )
         } else {
           setError(err.message)
         }
+      } else if (err instanceof Error && err.message.trim()) {
+        setError(err.message.trim())
       } else {
         setError("No se pudo activar el aviso. Probá de nuevo.")
       }
