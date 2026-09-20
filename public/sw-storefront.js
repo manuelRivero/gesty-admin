@@ -1,13 +1,15 @@
 /* Storefront order push — scope: / */
+/* v3: icon absolute + force clients to re-fetch SW */
 
-/** Paths relativos en /public — siempre se absolutizan al origin del SW. */
 var PUSH_ICON_PATH = "/food-notification-icon.png"
 var PUSH_BADGE_PATH = "/food-notification-badge.png"
 
 function absoluteAsset(path) {
+  var base =
+    (self.registration && self.registration.scope) || self.location.origin
   try {
-    return new URL(path, self.location.origin).href
-  } catch {
+    return new URL(path, base).href
+  } catch (e) {
     return path
   }
 }
@@ -15,54 +17,66 @@ function absoluteAsset(path) {
 async function parsePushData(event) {
   if (!event.data) return {}
   try {
-    const text = await event.data.text()
+    var text = await event.data.text()
     if (!text) return {}
     return JSON.parse(text)
-  } catch {
+  } catch (e) {
     return {}
   }
 }
 
-self.addEventListener("push", (event) => {
-  event.waitUntil(
-    (async () => {
-      const data = await parsePushData(event)
+self.addEventListener("install", function (event) {
+  // Activa ya el SW nuevo (no esperar a cerrar todas las pestañas).
+  event.waitUntil(self.skipWaiting())
+})
 
-      const title =
+self.addEventListener("activate", function (event) {
+  event.waitUntil(self.clients.claim())
+})
+
+self.addEventListener("push", function (event) {
+  event.waitUntil(
+    (async function () {
+      var data = await parsePushData(event)
+
+      var title =
         typeof data.title === "string" && data.title.trim()
           ? data.title.trim()
           : "Actualización de tu pedido"
-      const body =
+      var body =
         typeof data.body === "string" && data.body.trim()
           ? data.body.trim()
           : "Tocá para ver el estado."
-      const url =
+      var url =
         typeof data.url === "string" && data.url.trim()
           ? data.url.trim()
           : "/"
-      const tag =
+      var tag =
         typeof data.tag === "string" && data.tag.trim()
           ? data.tag.trim()
           : data.orderId
-            ? `gesty-order-${data.orderId}`
+            ? "gesty-order-" + data.orderId
             : "gesty-order"
 
-      // Chrome Android en eventos `push` suele fallar con path relativo → monograma "G".
-      const icon =
-        typeof data.icon === "string" && /^https?:\/\//i.test(data.icon.trim())
-          ? data.icon.trim()
-          : absoluteAsset(PUSH_ICON_PATH)
-      const badge = absoluteAsset(PUSH_BADGE_PATH)
+      // Siempre absolutas desde el origin del SW (Chrome Android ignora relativas → "G").
+      var icon = absoluteAsset(PUSH_ICON_PATH)
+      var badge = absoluteAsset(PUSH_BADGE_PATH)
+      if (
+        typeof data.icon === "string" &&
+        /^https:\/\//i.test(data.icon.trim())
+      ) {
+        icon = data.icon.trim()
+      }
 
       await self.registration.showNotification(title, {
-        body,
-        tag,
-        icon,
-        badge,
+        body: body,
+        tag: tag,
+        icon: icon,
+        badge: badge,
         renotify: true,
         requireInteraction: false,
         data: {
-          url,
+          url: url,
           orderId: data.orderId,
           slug: data.slug,
           status: data.status,
@@ -72,29 +86,31 @@ self.addEventListener("push", (event) => {
   )
 })
 
-self.addEventListener("notificationclick", (event) => {
+self.addEventListener("notificationclick", function (event) {
   event.notification.close()
-  const rawUrl =
-    event.notification?.data?.url &&
+  var rawUrl =
+    event.notification &&
+    event.notification.data &&
     typeof event.notification.data.url === "string"
       ? event.notification.data.url
       : "/"
-  const targetUrl = new URL(rawUrl, self.location.origin).href
+  var targetUrl = new URL(rawUrl, self.location.origin).href
 
   event.waitUntil(
-    (async () => {
-      const clientsList = await self.clients.matchAll({
+    (async function () {
+      var clientsList = await self.clients.matchAll({
         type: "window",
         includeUncontrolled: true,
       })
-      for (const client of clientsList) {
+      for (var i = 0; i < clientsList.length; i++) {
+        var client = clientsList[i]
         if ("focus" in client) {
           await client.focus()
           if ("navigate" in client && typeof client.navigate === "function") {
             try {
               await client.navigate(targetUrl)
               return
-            } catch {
+            } catch (e) {
               /* fall through */
             }
           }

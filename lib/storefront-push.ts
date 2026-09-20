@@ -5,7 +5,7 @@ import {
   type PublicPushSubscriptionInput,
 } from "@/lib/requests/public-order-push"
 
-export const STOREFRONT_SW_PATH = "/sw-storefront.js"
+export const STOREFRONT_SW_PATH = "/sw-storefront.js?v=3"
 /** PNG con alpha real (plato + cubiertos). */
 export const STOREFRONT_PUSH_ICON_PATH = "/food-notification-icon.png"
 export const STOREFRONT_PUSH_BADGE_PATH = "/food-notification-badge.png"
@@ -69,8 +69,17 @@ export async function ensureStorefrontServiceWorker(): Promise<ServiceWorkerRegi
   try {
     const registration = await navigator.serviceWorker.register(
       STOREFRONT_SW_PATH,
-      { scope: "/" },
+      {
+        scope: "/",
+        // Evita servir un SW viejo cacheado por el HTTP cache de Chrome.
+        updateViaCache: "none",
+      },
     )
+    try {
+      await registration.update()
+    } catch {
+      /* noop */
+    }
     await navigator.serviceWorker.ready
     return registration
   } catch (err) {
