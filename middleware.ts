@@ -9,10 +9,23 @@ import {
 
 const LOGIN_PATH = "/login"
 
+/** Rutas públicas (sin cookie). `/login` se trata aparte por el redirect si ya hay sesión. */
+const PUBLIC_PATHS = ["/shopping"] as const
+
+function isPublicPath(pathname: string): boolean {
+  return PUBLIC_PATHS.some(
+    (path) => pathname === path || pathname.startsWith(`${path}/`),
+  )
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   if (pathname.startsWith("/api")) {
+    return NextResponse.next()
+  }
+
+  if (isPublicPath(pathname)) {
     return NextResponse.next()
   }
 

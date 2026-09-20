@@ -5,7 +5,7 @@ import {
   getAuthCookie,
 } from "@/lib/auth"
 
-function resolveApiBaseUrl(): string | undefined {
+export function resolveApiBaseUrl(): string | undefined {
   const raw =
     process.env.NEXT_PUBLIC_API ??
     (typeof window === "undefined" ? process.env.API : undefined)
@@ -20,6 +20,17 @@ export const api = axios.create({
   },
   /** Cookie HttpOnly `access_token` (si el backend la usa). */
   withCredentials: true,
+})
+
+/**
+ * Cliente sin JWT ni redirect a `/login`.
+ * Para storefront público (`/public/...`).
+ */
+export const publicApi = axios.create({
+  baseURL: resolveApiBaseUrl(),
+  headers: {
+    "Content-Type": "application/json",
+  },
 })
 
 api.interceptors.request.use((config) => {

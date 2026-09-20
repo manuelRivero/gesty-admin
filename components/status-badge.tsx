@@ -30,6 +30,11 @@ const ORDER_STATUS_BADGE: Record<
     label: "Enviado",
     className: "bg-violet-100 text-violet-900 dark:bg-violet-900/30 dark:text-violet-300",
   },
+  ready_for_pickup: {
+    label: "Listo para retirar",
+    className:
+      "bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-300",
+  },
   delivered: {
     label: "Entregado",
     className: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",

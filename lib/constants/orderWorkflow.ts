@@ -21,13 +21,14 @@ export type AdminPatchableOrderStatus =
   (typeof ADMIN_PATCH_ORDER_STATUSES)[number]
 
 export const ORDER_STATUS_LABEL_ES: Record<
-  (typeof ORDER_STATUS_PIPELINE)[number] | "cancelled",
+  (typeof ORDER_STATUS_PIPELINE)[number] | "cancelled" | "ready_for_pickup",
   string
 > = {
   draft: "Borrador",
   placed: "Pedido recibido",
   preparing: "En preparación",
   shipped: "Enviado",
+  ready_for_pickup: "Listo para retirar",
   delivered: "Entregado",
   cancelled: "Cancelado",
 }
