@@ -1,39 +1,53 @@
 /* Storefront order push — scope: / */
 
-self.addEventListener("push", (event) => {
-  let data = {}
+async function parsePushData(event) {
+  if (!event.data) return {}
   try {
-    data = event.data ? event.data.json() : {}
+    const text = await event.data.text()
+    if (!text) return {}
+    return JSON.parse(text)
   } catch {
-    data = {}
+    return {}
   }
+}
 
-  const title =
-    typeof data.title === "string" && data.title.trim()
-      ? data.title.trim()
-      : "Actualización de tu pedido"
-  const body =
-    typeof data.body === "string" && data.body.trim()
-      ? data.body.trim()
-      : "Tocá para ver el estado."
-  const url =
-    typeof data.url === "string" && data.url.trim()
-      ? data.url.trim()
-      : "/"
-  const tag =
-    typeof data.tag === "string" && data.tag.trim()
-      ? data.tag.trim()
-      : data.orderId
-        ? `gesty-order-${data.orderId}`
-        : "gesty-order"
-
+self.addEventListener("push", (event) => {
   event.waitUntil(
-    self.registration.showNotification(title, {
-      body,
-      tag,
-      renotify: true,
-      data: { url, orderId: data.orderId, slug: data.slug, status: data.status },
-    }),
+    (async () => {
+      const data = await parsePushData(event)
+
+      const title =
+        typeof data.title === "string" && data.title.trim()
+          ? data.title.trim()
+          : "Actualización de tu pedido"
+      const body =
+        typeof data.body === "string" && data.body.trim()
+          ? data.body.trim()
+          : "Tocá para ver el estado."
+      const url =
+        typeof data.url === "string" && data.url.trim()
+          ? data.url.trim()
+          : "/"
+      const tag =
+        typeof data.tag === "string" && data.tag.trim()
+          ? data.tag.trim()
+          : data.orderId
+            ? `gesty-order-${data.orderId}`
+            : "gesty-order"
+
+      await self.registration.showNotification(title, {
+        body,
+        tag,
+        renotify: true,
+        requireInteraction: false,
+        data: {
+          url,
+          orderId: data.orderId,
+          slug: data.slug,
+          status: data.status,
+        },
+      })
+    })(),
   )
 })
 

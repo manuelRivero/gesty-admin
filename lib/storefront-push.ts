@@ -157,6 +157,21 @@ export async function subscribeStorefrontOrderPush(
     toSubscriptionInput(subscription),
   )
   writeStorefrontPushOptIn(slug, orderId)
+
+  // Prueba local: confirma permiso + SW. No depende del backend.
+  try {
+    await registration.showNotification("Avisos activados", {
+      body: "Te vamos a avisar cuando el pedido avance. Podés salir de esta página.",
+      tag: `gesty-order-${orderId.trim()}-optin`,
+      data: {
+        url: `/shopping/${encodeURIComponent(slug.trim())}/order/${encodeURIComponent(orderId.trim())}`,
+        orderId: orderId.trim(),
+        slug: slug.trim(),
+      },
+    })
+  } catch {
+    /* noop — el opt-in ya quedó registrado */
+  }
 }
 
 /** Probe silencioso: ¿el backend tiene VAPID? */

@@ -153,6 +153,7 @@ export function ShoppingOrderDetail({
           slug={slug}
           orderId={orderId}
           status={order.status}
+          fulfillmentType={order.fulfillmentType}
         />
 
         <section className="space-y-3">

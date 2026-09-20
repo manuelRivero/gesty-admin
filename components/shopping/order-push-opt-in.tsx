@@ -17,12 +17,21 @@ type OrderPushOptInProps = {
   slug: string
   orderId: string
   status: string
+  fulfillmentType?: string | null
+}
+
+function pushHintForFulfillment(fulfillmentType?: string | null): string {
+  const delivery = fulfillmentType?.trim().toUpperCase() === "DELIVERY"
+  return delivery
+    ? "Te avisamos cuando el pedido salga en camino (aunque cierres esta página)."
+    : "Te avisamos cuando esté listo para retirar (aunque cierres esta página)."
 }
 
 export function OrderPushOptIn({
   slug,
   orderId,
   status,
+  fulfillmentType,
 }: OrderPushOptInProps) {
   const terminal = isTerminalShoppingOrderStatus(status)
   const [supported, setSupported] = React.useState(false)
@@ -30,6 +39,7 @@ export function OrderPushOptIn({
   const [optedIn, setOptedIn] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
+  const hint = pushHintForFulfillment(fulfillmentType)
 
   React.useEffect(() => {
     setSupported(isStorefrontPushSupported())
@@ -60,10 +70,7 @@ export function OrderPushOptIn({
         <BellRing className="mt-0.5 size-4 shrink-0" aria-hidden />
         <div>
           <p className="font-medium">Te vamos a avisar</p>
-          <p className="mt-0.5 text-xs opacity-90">
-            Vas a recibir una notificación cuando el pedido avance, aunque
-            salgas de esta página.
-          </p>
+          <p className="mt-0.5 text-xs opacity-90">{hint}</p>
         </div>
       </div>
     )
@@ -114,10 +121,7 @@ export function OrderPushOptIn({
         <div className="min-w-0 flex-1 space-y-2">
           <div>
             <p className="text-sm font-medium">Avisame cuando avance</p>
-            <p className="text-muted-foreground mt-0.5 text-xs">
-              Te llega una notificación del teléfono si el pedido pasa a listo
-              o en camino.
-            </p>
+            <p className="text-muted-foreground mt-0.5 text-xs">{hint}</p>
           </div>
           <Button
             type="button"
