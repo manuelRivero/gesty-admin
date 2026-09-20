@@ -1,60 +1,30 @@
-import { getOrderPaymentStatusLabelEs } from "@/lib/constants/orderWorkflow"
+import { getOrderPaymentStatusLabelEs, getOrderStatusLabelEs } from "@/lib/constants/orderWorkflow"
 import { cn } from "@/lib/utils"
 
-/** Mapeo para `orders.status` (string en BD) y valores legacy de la UI. */
-const ORDER_STATUS_BADGE: Record<
-  string,
-  { label: string; className: string }
-> = {
-  draft: {
-    label: "Borrador",
-    className: "bg-slate-100 text-slate-800 dark:bg-slate-900/40 dark:text-slate-300",
-  },
-  placed: {
-    label: "Pedido recibido",
-    className: "bg-cyan-100 text-cyan-900 dark:bg-cyan-900/30 dark:text-cyan-300",
-  },
-  pending_payment: {
-    label: "Pago pendiente",
-    className: "bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-300",
-  },
-  confirmed: {
-    label: "Confirmado",
-    className: "bg-cyan-100 text-cyan-900 dark:bg-cyan-900/30 dark:text-cyan-400",
-  },
-  preparing: {
-    label: "En preparación",
-    className: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-  },
-  shipped: {
-    label: "Enviado",
-    className: "bg-violet-100 text-violet-900 dark:bg-violet-900/30 dark:text-violet-300",
-  },
-  ready_for_pickup: {
-    label: "Listo para retirar",
-    className:
-      "bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-300",
-  },
-  delivered: {
-    label: "Entregado",
-    className: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-  },
-  cancelled: {
-    label: "Cancelado",
-    className: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-  },
-  pending: {
-    label: "Pendiente",
-    className: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
-  },
-  processing: {
-    label: "En proceso",
-    className: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-  },
-  completed: {
-    label: "Completado",
-    className: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-  },
+/** Colores por status BD (el label puede variar por modalidad). */
+const ORDER_STATUS_BADGE_STYLE: Record<string, string> = {
+  draft: "bg-slate-100 text-slate-800 dark:bg-slate-900/40 dark:text-slate-300",
+  placed:
+    "bg-cyan-100 text-cyan-900 dark:bg-cyan-900/30 dark:text-cyan-300",
+  pending_payment:
+    "bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-300",
+  confirmed:
+    "bg-cyan-100 text-cyan-900 dark:bg-cyan-900/30 dark:text-cyan-400",
+  preparing:
+    "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
+  shipped:
+    "bg-violet-100 text-violet-900 dark:bg-violet-900/30 dark:text-violet-300",
+  ready_for_pickup:
+    "bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-300",
+  delivered:
+    "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+  cancelled: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+  pending:
+    "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
+  processing:
+    "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
+  completed:
+    "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
 }
 
 const RESERVATION_STATUS_BADGE: Record<
@@ -105,21 +75,29 @@ const ORDER_PAYMENT_STATUS_BADGE: Record<
   },
 }
 
-export function OrderStatusBadge({ status }: { status: string }) {
+export function OrderStatusBadge({
+  status,
+  isDelivery = true,
+}: {
+  status: string
+  /** false = retiro: `shipped` se muestra como “Listo para retirar”. */
+  isDelivery?: boolean
+}) {
   const key = status.toLowerCase()
-  const config = ORDER_STATUS_BADGE[key] ?? {
-    label: status,
-    className:
-      "bg-muted text-muted-foreground dark:bg-muted/80",
-  }
+  const label = getOrderStatusLabelEs(status, isDelivery)
+  const styleKey =
+    !isDelivery && key === "shipped" ? "ready_for_pickup" : key
+  const className =
+    ORDER_STATUS_BADGE_STYLE[styleKey] ??
+    "bg-muted text-muted-foreground dark:bg-muted/80"
   return (
     <span
       className={cn(
         "inline-flex items-center rounded-full px-2 py-1 text-xs font-medium",
-        config.className,
+        className,
       )}
     >
-      {config.label}
+      {label}
     </span>
   )
 }

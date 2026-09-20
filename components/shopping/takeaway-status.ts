@@ -95,8 +95,8 @@ export function getOrderStatusCopy(
   }
   if (mode === "TAKE_AWAY" && s === "shipped") {
     return {
-      title: "En camino",
-      hint: "Tu pedido está en tránsito.",
+      title: "Listo para retirar",
+      hint: "Acercate al mostrador.",
     }
   }
   return {
@@ -119,7 +119,8 @@ export function getOrderStepIndex(
   if (s === "cancelled") return -1
   const steps = getStatusSteps(mode)
   if (mode === "TAKE_AWAY" && s === "shipped") {
-    return steps.indexOf("preparing")
+    // Admin PATCH usa `shipped` como “listo para retirar”.
+    return steps.indexOf("ready_for_pickup")
   }
   if (mode === "DELIVERY" && s === "ready_for_pickup") {
     return steps.indexOf("preparing")

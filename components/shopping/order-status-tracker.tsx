@@ -33,7 +33,8 @@ export function OrderStatusTracker({
   const cancelled = status.trim().toLowerCase() === "cancelled"
   const highlight =
     mode === "TAKE_AWAY"
-      ? status.trim().toLowerCase() === "ready_for_pickup"
+      ? status.trim().toLowerCase() === "ready_for_pickup" ||
+        status.trim().toLowerCase() === "shipped"
       : status.trim().toLowerCase() === "shipped"
 
   return (

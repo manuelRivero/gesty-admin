@@ -98,7 +98,7 @@ function ShoppingPageContent({
     if (isDeliveryFulfillment(activeOrder.fulfillmentType)) {
       return status === "shipped"
     }
-    return status === "ready_for_pickup"
+    return status === "ready_for_pickup" || status === "shipped"
   })()
 
   const emptyMessage = normalizedQuery

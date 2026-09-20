@@ -41,7 +41,7 @@ import { cn } from "@/lib/utils"
 import { getUserRoleFromCookie } from "@/lib/auth"
 import { fetchAdminBusinessConfig } from "@/lib/requests/business-config"
 import {
-  ADMIN_PATCH_ORDER_LABEL_ES,
+  getAdminPatchOrderLabelEs,
   getNextPatchableOrderStatus,
   type AdminPatchableOrderStatus,
 } from "@/lib/constants/orderWorkflow"
@@ -183,7 +183,7 @@ export function OrdersTable({
       setSelectedOrder((prev) =>
         prev?.id === result.order.id ? result.order : prev,
       )
-      toast.success("Estado de envío actualizado")
+      toast.success("Estado del pedido actualizado")
       if (
         newStatus === "shipped" &&
         orderIsDeliveryFulfillment(result.order) &&
@@ -269,6 +269,7 @@ export function OrdersTable({
               {orders.map((order) => {
                 const isNew = highlightOrderIds.includes(order.id)
                 const nextPatchStatus = getNextPatchableOrderStatus(order.status)
+                const isDelivery = orderIsDeliveryFulfillment(order)
                 return (
                   <TableRow
                     key={order.id}
@@ -295,14 +296,25 @@ export function OrdersTable({
                     <TableCell>{orderCustomerLabel(order.customer)}</TableCell>
                     <TableCell>
                       <div className="flex flex-col gap-1">
-                        <OrderStatusBadge status={order.status} />
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <OrderStatusBadge
+                            status={order.status}
+                            isDelivery={isDelivery}
+                          />
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] font-normal"
+                          >
+                            {isDelivery ? "Envío" : "Retiro"}
+                          </Badge>
+                        </div>
                         {order.assignedDeliveryUser ? (
                           <span className="text-xs text-muted-foreground">
                             {order.assignedDeliveryUser.name?.trim() ||
                               order.assignedDeliveryUser.email}
                           </span>
                         ) : ownFleetAssignment &&
-                          orderIsDeliveryFulfillment(order) &&
+                          isDelivery &&
                           order.status === "shipped" ? (
                           <span className="text-xs text-amber-600 dark:text-amber-400">
                             Sin repartidor
@@ -345,7 +357,10 @@ export function OrdersTable({
                             }
                           >
                             Cambiar a{" "}
-                            {ADMIN_PATCH_ORDER_LABEL_ES[nextPatchStatus]}
+                            {getAdminPatchOrderLabelEs(
+                              nextPatchStatus,
+                              isDelivery,
+                            )}
                           </Button>
                         ) : null}
                       </div>
@@ -383,7 +398,17 @@ export function OrdersTable({
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Logística</p>
-                  <OrderStatusBadge status={selectedOrder.status} />
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                    <OrderStatusBadge
+                      status={selectedOrder.status}
+                      isDelivery={orderIsDeliveryFulfillment(selectedOrder)}
+                    />
+                    <Badge variant="outline" className="text-[10px] font-normal">
+                      {orderIsDeliveryFulfillment(selectedOrder)
+                        ? "Envío"
+                        : "Retiro"}
+                    </Badge>
+                  </div>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Pago</p>
@@ -658,6 +683,7 @@ export function OrdersTable({
               {(() => {
                 const next = getNextPatchableOrderStatus(selectedOrder.status)
                 if (!next) return null
+                const isDelivery = orderIsDeliveryFulfillment(selectedOrder)
                 return (
                   <>
                     <Separator />
@@ -669,7 +695,8 @@ export function OrdersTable({
                           void handleDeliveryStatusChange(selectedOrder, next)
                         }
                       >
-                        Cambiar a {ADMIN_PATCH_ORDER_LABEL_ES[next]}
+                        Cambiar a{" "}
+                        {getAdminPatchOrderLabelEs(next, isDelivery)}
                       </Button>
                     </div>
                   </>
