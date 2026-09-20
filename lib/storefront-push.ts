@@ -6,8 +6,18 @@ import {
 } from "@/lib/requests/public-order-push"
 
 export const STOREFRONT_SW_PATH = "/sw-storefront.js"
-/** PNG: plato + cubiertos (notificaciones storefront). */
+/** PNG con alpha real (plato + cubiertos). */
 export const STOREFRONT_PUSH_ICON_PATH = "/food-notification-icon.png"
+export const STOREFRONT_PUSH_BADGE_PATH = "/food-notification-badge.png"
+
+function absoluteStorefrontAsset(path: string): string {
+  if (typeof window === "undefined") return path
+  try {
+    return new URL(path, window.location.origin).href
+  } catch {
+    return path
+  }
+}
 
 const OPT_IN_PREFIX = "gesty.shopping.pushOptIn.v1:"
 
@@ -165,8 +175,8 @@ export async function subscribeStorefrontOrderPush(
     await registration.showNotification("Avisos activados", {
       body: "Te vamos a avisar cuando el pedido avance. Podés salir de esta página.",
       tag: `gesty-order-${orderId.trim()}-optin`,
-      icon: STOREFRONT_PUSH_ICON_PATH,
-      badge: STOREFRONT_PUSH_ICON_PATH,
+      icon: absoluteStorefrontAsset(STOREFRONT_PUSH_ICON_PATH),
+      badge: absoluteStorefrontAsset(STOREFRONT_PUSH_BADGE_PATH),
       data: {
         url: `/shopping/${encodeURIComponent(slug.trim())}/order/${encodeURIComponent(orderId.trim())}`,
         orderId: orderId.trim(),

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <circle cx="128" cy="128" r="118" fill="#171717"/>
+  <g fill="none" stroke="#FAFAF9" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Plato -->
+    <circle cx="128" cy="132" r="40" stroke-width="8"/>
+    <circle cx="128" cy="132" r="23" stroke-width="5.5"/>
+
+    <!-- Tenedor -->
+    <g stroke-width="7.5">
+      <line x1="54" y1="54" x2="54" y2="96"/>
+      <line x1="68" y1="54" x2="68" y2="96"/>
+      <line x1="82" y1="54" x2="82" y2="96"/>
+      <path d="M54 96h28"/>
+      <line x1="68" y1="96" x2="68" y2="198"/>
+    </g>
+
+    <!-- Cuchara -->
+    <g stroke-width="7.5">
+      <ellipse cx="190" cy="78" rx="19" ry="25"/>
+      <line x1="190" y1="103" x2="190" y2="198"/>
+    </g>
+  </g>
+</svg>

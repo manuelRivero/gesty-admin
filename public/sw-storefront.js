@@ -1,7 +1,16 @@
 /* Storefront order push — scope: / */
 
-/** Ícono genérico comida (PNG en /public). Relativo al origin del SW. */
-var DEFAULT_PUSH_ICON = "/food-notification-icon.png"
+/** Paths relativos en /public — siempre se absolutizan al origin del SW. */
+var PUSH_ICON_PATH = "/food-notification-icon.png"
+var PUSH_BADGE_PATH = "/food-notification-badge.png"
+
+function absoluteAsset(path) {
+  try {
+    return new URL(path, self.location.origin).href
+  } catch {
+    return path
+  }
+}
 
 async function parsePushData(event) {
   if (!event.data) return {}
@@ -37,16 +46,19 @@ self.addEventListener("push", (event) => {
           : data.orderId
             ? `gesty-order-${data.orderId}`
             : "gesty-order"
+
+      // Chrome Android en eventos `push` suele fallar con path relativo → monograma "G".
       const icon =
-        typeof data.icon === "string" && data.icon.trim()
+        typeof data.icon === "string" && /^https?:\/\//i.test(data.icon.trim())
           ? data.icon.trim()
-          : DEFAULT_PUSH_ICON
+          : absoluteAsset(PUSH_ICON_PATH)
+      const badge = absoluteAsset(PUSH_BADGE_PATH)
 
       await self.registration.showNotification(title, {
         body,
         tag,
         icon,
-        badge: DEFAULT_PUSH_ICON,
+        badge,
         renotify: true,
         requireInteraction: false,
         data: {
