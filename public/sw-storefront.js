@@ -1,5 +1,8 @@
 /* Storefront order push — scope: / */
 
+/** Ícono genérico comida (PNG en /public). Relativo al origin del SW. */
+var DEFAULT_PUSH_ICON = "/food-notification-icon.png"
+
 async function parsePushData(event) {
   if (!event.data) return {}
   try {
@@ -34,10 +37,16 @@ self.addEventListener("push", (event) => {
           : data.orderId
             ? `gesty-order-${data.orderId}`
             : "gesty-order"
+      const icon =
+        typeof data.icon === "string" && data.icon.trim()
+          ? data.icon.trim()
+          : DEFAULT_PUSH_ICON
 
       await self.registration.showNotification(title, {
         body,
         tag,
+        icon,
+        badge: DEFAULT_PUSH_ICON,
         renotify: true,
         requireInteraction: false,
         data: {
