@@ -42,6 +42,12 @@ export interface ShoppingProduct {
   imageUrl: string | null
   categoryId: string
   available: boolean
+  /** Personas que alimenta la porción (si el menú público lo expone). */
+  servesPeople?: number | null
+  ingredients?: string | null
+  ingredientsNotes?: string | null
+  preparation?: string | null
+  variations?: string[] | null
 }
 
 export interface ShoppingCatalog {

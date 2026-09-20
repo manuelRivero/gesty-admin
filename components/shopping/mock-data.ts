@@ -62,6 +62,10 @@ export const MOCK_PRODUCTS: ShoppingProduct[] = [
     imageUrl: img("asado"),
     categoryId: "cat-main",
     available: true,
+    servesPeople: 2,
+    ingredients: "Asado de tira, sal gruesa, chimichurri.",
+    ingredientsNotes: "Cocción a la leña. Consultar punto de cocción.",
+    variations: ["Jugoso", "A punto", "Cocido"],
   },
   {
     id: "prod-4",
@@ -82,6 +86,9 @@ export const MOCK_PRODUCTS: ShoppingProduct[] = [
     imageUrl: img("milanesa"),
     categoryId: "cat-main",
     available: true,
+    servesPeople: 1,
+    ingredients: "Carne vacuna, pan rallado, jamón, mozzarella, salsa de tomate.",
+    variations: ["Con papas", "Con puré", "Sola"],
   },
   {
     id: "prod-6",

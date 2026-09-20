@@ -70,6 +70,12 @@ type PublicMenuItemRaw = {
   featured?: boolean
   variations?: string[] | null
   discount?: PublicMenuItemDiscountRaw | null
+  servesPeople?: number | null
+  serves_people?: number | null
+  ingredients?: string | null
+  ingredientsNotes?: string | null
+  ingredients_notes?: string | null
+  preparation?: string | null
 }
 
 type PublicMenuResponseRaw = {
@@ -136,6 +142,26 @@ function mapCategory(raw: PublicCategoryRaw): ShoppingCategory | null {
   }
 }
 
+function toTrimmedOrNull(v: string | null | undefined): string | null {
+  const t = typeof v === "string" ? v.trim() : ""
+  return t.length > 0 ? t : null
+}
+
+function mapVariations(raw: PublicMenuItemRaw): string[] | null {
+  const v = raw.variations
+  if (!Array.isArray(v) || v.length === 0) return null
+  const items = v
+    .filter((x): x is string => typeof x === "string")
+    .map((x) => x.trim())
+    .filter((x) => x.length > 0)
+  return items.length > 0 ? items : null
+}
+
+function mapServesPeople(raw: PublicMenuItemRaw): number | null {
+  const n = raw.servesPeople ?? raw.serves_people
+  return typeof n === "number" && Number.isFinite(n) && n > 0 ? n : null
+}
+
 function mapProduct(
   raw: PublicMenuItemRaw,
   fallbackCurrency: string,
@@ -153,7 +179,7 @@ function mapProduct(
   return {
     id,
     name,
-    description: raw.description?.trim() || null,
+    description: toTrimmedOrNull(raw.description),
     price,
     currencyCode: raw.currencyCode?.trim() || fallbackCurrency,
     imageUrl: resolveMenuItemImageUrl({
@@ -162,6 +188,13 @@ function mapProduct(
     }),
     categoryId,
     available: raw.available !== false,
+    servesPeople: mapServesPeople(raw),
+    ingredients: toTrimmedOrNull(raw.ingredients),
+    ingredientsNotes: toTrimmedOrNull(
+      raw.ingredientsNotes ?? raw.ingredients_notes,
+    ),
+    preparation: toTrimmedOrNull(raw.preparation),
+    variations: mapVariations(raw),
   }
 }
 
