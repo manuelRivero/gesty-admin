@@ -20,6 +20,11 @@ export class PublicStorefrontNotFoundError extends Error {
   }
 }
 
+type PublicLocationRaw = {
+  latitude?: number | null
+  longitude?: number | null
+}
+
 type PublicBusinessRaw = {
   id?: string
   name?: string | null
@@ -32,6 +37,10 @@ type PublicBusinessRaw = {
   isOpen?: boolean
   nextOpenText?: string | null
   imageUrl?: string | null
+  latitude?: number | null
+  longitude?: number | null
+  location?: PublicLocationRaw | null
+  mapCenter?: PublicLocationRaw | null
 }
 
 type PublicCategoryRaw = {
@@ -76,6 +85,24 @@ function parseDecimal(v: string | number | null | undefined): number | null {
   return Number.isFinite(n) ? n : null
 }
 
+function parseMapCenter(
+  raw: PublicLocationRaw | null | undefined,
+  fallbackLat?: number | null,
+  fallbackLng?: number | null,
+): ShoppingBusiness["mapCenter"] {
+  const lat = raw?.latitude ?? fallbackLat
+  const lng = raw?.longitude ?? fallbackLng
+  if (
+    typeof lat !== "number" ||
+    typeof lng !== "number" ||
+    !Number.isFinite(lat) ||
+    !Number.isFinite(lng)
+  ) {
+    return null
+  }
+  return { latitude: lat, longitude: lng }
+}
+
 function mapBusiness(raw: PublicBusinessRaw): ShoppingBusiness {
   const tagline =
     (typeof raw.tagline === "string" && raw.tagline.trim()) ||
@@ -90,6 +117,10 @@ function mapBusiness(raw: PublicBusinessRaw): ShoppingBusiness {
     currencyCode: (raw.currencyCode ?? raw.currency_code)?.trim() || "UYU",
     isOpen: typeof raw.isOpen === "boolean" ? raw.isOpen : undefined,
     nextOpenText: raw.nextOpenText ?? null,
+    mapCenter:
+      parseMapCenter(raw.mapCenter) ??
+      parseMapCenter(raw.location) ??
+      parseMapCenter(undefined, raw.latitude, raw.longitude),
   }
 }
 

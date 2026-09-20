@@ -7,6 +7,10 @@ import {
   ShoppingPage,
 } from "@/components/shopping/shopping-page"
 import {
+  DEFAULT_PUBLIC_FULFILLMENT,
+  fetchPublicStorefrontFulfillment,
+} from "@/lib/requests/public-fulfillment"
+import {
   fetchPublicStorefrontMenu,
   PublicStorefrontNotFoundError,
 } from "@/lib/requests/public-storefront"
@@ -41,8 +45,17 @@ export default async function ShoppingSlugPage({
   const { slug } = await params
 
   try {
-    const catalog = await fetchPublicStorefrontMenu(slug)
-    return <ShoppingPage catalog={catalog} slug={slug} />
+    const [catalog, fulfillment] = await Promise.all([
+      fetchPublicStorefrontMenu(slug),
+      fetchPublicStorefrontFulfillment(slug).catch(() => null),
+    ])
+    return (
+      <ShoppingPage
+        catalog={catalog}
+        slug={slug}
+        fulfillment={fulfillment ?? DEFAULT_PUBLIC_FULFILLMENT}
+      />
+    )
   } catch (error) {
     if (error instanceof PublicStorefrontNotFoundError) {
       return <ShoppingNotFound slug={slug} />

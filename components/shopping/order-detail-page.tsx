@@ -19,6 +19,7 @@ import {
   readActiveShoppingOrder,
   writeActiveShoppingOrder,
 } from "./active-order-storage"
+import { OrderPushOptIn } from "./order-push-opt-in"
 import { OrderStatusTracker } from "./order-status-tracker"
 
 const POLL_MS = 8_000
@@ -143,7 +144,16 @@ export function ShoppingOrderDetail({
       </header>
 
       <main className="flex-1 space-y-6 px-4 py-5 pb-10">
-        <OrderStatusTracker status={order.status} />
+        <OrderStatusTracker
+          status={order.status}
+          fulfillmentType={order.fulfillmentType}
+        />
+
+        <OrderPushOptIn
+          slug={slug}
+          orderId={orderId}
+          status={order.status}
+        />
 
         <section className="space-y-3">
           <h2 className="text-sm font-medium">Resumen</h2>
@@ -169,14 +179,40 @@ export function ShoppingOrderDetail({
               </li>
             ))}
           </ul>
+          {order.deliveryFee ? (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Envío</span>
+              <span className="tabular-nums">
+                {formatMenuItemPrice(order.deliveryFee, order.currencyCode)}
+              </span>
+            </div>
+          ) : null}
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Total</span>
             <span className="font-semibold tabular-nums">
               {formatMenuItemPrice(order.total, order.currencyCode)}
             </span>
           </div>
+          {order.address?.streetAddress ? (
+            <div className="rounded-lg border px-3 py-2.5 text-sm">
+              <p className="font-medium">Entrega en</p>
+              <p className="text-muted-foreground mt-0.5">
+                {[order.address.streetAddress, order.address.apartment]
+                  .filter(Boolean)
+                  .join(", ")}
+                {order.address.city ? ` · ${order.address.city}` : null}
+              </p>
+              {order.address.instructions ? (
+                <p className="text-muted-foreground mt-1 text-xs">
+                  {order.address.instructions}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
           <p className="text-muted-foreground text-xs">
-            Retiro en mostrador · pagás en efectivo
+            {order.fulfillmentType?.toUpperCase() === "DELIVERY"
+              ? "Pagás al recibir. Seguí el estado acá."
+              : "Te vamos a llamar por tu nombre cuando esté listo."}
           </p>
         </section>
 

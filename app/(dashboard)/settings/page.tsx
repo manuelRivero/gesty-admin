@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { BotPersonalitySelector } from "@/components/settings/bot-personality-selector"
 import { OrdersSetupChecklist } from "@/components/settings/orders-setup-checklist"
+import { StorefrontSetupPanel } from "@/components/settings/storefront-setup-panel"
 import { SettingsFormFooter, SETTINGS_UNSAVED_MESSAGE } from "@/components/settings/settings-form-footer"
 import { SettingsSection } from "@/components/settings/settings-section"
 import { ToggleField } from "@/components/settings/toggle-field"
@@ -18,6 +19,11 @@ import {
   type OrdersSetupStatus,
 } from "@/lib/orders-setup"
 import {
+  buildStorefrontSetupStatus,
+  fetchStorefrontSetupPrerequisites,
+  type StorefrontSetupStatus,
+} from "@/lib/storefront-setup"
+import {
   fetchAdminBusinessConfig,
   getBusinessConfigApiErrorMessage,
   patchAdminBusinessConfig,
@@ -25,6 +31,7 @@ import {
   type AdminBusinessConfig,
   type AdminBusinessConfigPatch,
 } from "@/lib/requests/business-config"
+import { fetchAdminBusinessProfile } from "@/lib/requests/business-profile"
 import { useUnsavedChangesToast } from "@/hooks/use-unsaved-changes-toast"
 
 type SettingsData = AdminBusinessConfig
@@ -43,6 +50,10 @@ export default function SettingsPage() {
   const [isResetting, setIsResetting] = useState(false)
   const [setupStatus, setSetupStatus] = useState<OrdersSetupStatus | null>(null)
   const [isSetupLoading, setIsSetupLoading] = useState(true)
+  const [businessSlug, setBusinessSlug] = useState<string | null>(null)
+  const [storefrontStatus, setStorefrontStatus] =
+    useState<StorefrontSetupStatus | null>(null)
+  const [isStorefrontSetupLoading, setIsStorefrontSetupLoading] = useState(true)
 
   const refreshSetupStatus = useCallback(async (config: SettingsData) => {
     setIsSetupLoading(true)
@@ -61,13 +72,41 @@ export default function SettingsPage() {
     }
   }, [])
 
+  const refreshStorefrontStatus = useCallback(
+    async (config: SettingsData, slug: string | null) => {
+      setIsStorefrontSetupLoading(true)
+      try {
+        const status = await fetchStorefrontSetupPrerequisites({
+          config: {
+            storefront_enabled: config.storefront_enabled,
+            orders_enabled: config.orders_enabled,
+            takeaway_enabled: config.takeaway_enabled,
+          },
+          slug,
+        })
+        setStorefrontStatus(status)
+      } catch {
+        setStorefrontStatus(null)
+      } finally {
+        setIsStorefrontSetupLoading(false)
+      }
+    },
+    [],
+  )
+
   const loadConfig = useCallback(async () => {
     setIsLoading(true)
     try {
-      const data = await fetchAdminBusinessConfig()
+      const [data, profile] = await Promise.all([
+        fetchAdminBusinessConfig(),
+        fetchAdminBusinessProfile(),
+      ])
+      const slug = profile.slug?.trim() || null
+      setBusinessSlug(slug)
       setSettings(data)
       setInitialSettings(data)
       void refreshSetupStatus(data)
+      void refreshStorefrontStatus(data, slug)
     } catch (e) {
       toast.error(
         getBusinessConfigApiErrorMessage(e, "No se pudo cargar la configuración."),
@@ -75,7 +114,7 @@ export default function SettingsPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [refreshSetupStatus])
+  }, [refreshSetupStatus, refreshStorefrontStatus])
 
   useEffect(() => {
     void loadConfig()
@@ -132,6 +171,19 @@ export default function SettingsPage() {
       }),
     }
   }, [settings, setupStatus])
+
+  const storefrontChecklistStatus = useMemo<StorefrontSetupStatus | null>(() => {
+    if (!settings || !storefrontStatus) return storefrontStatus
+    return buildStorefrontSetupStatus({
+      config: {
+        storefront_enabled: settings.storefront_enabled,
+        orders_enabled: settings.orders_enabled,
+        takeaway_enabled: settings.takeaway_enabled,
+      },
+      slug: businessSlug,
+      hasActiveMenu: storefrontStatus.hasActiveMenu,
+    })
+  }, [settings, storefrontStatus, businessSlug])
 
   useUnsavedChangesToast(isDirty, SETTINGS_UNSAVED_MESSAGE)
 
@@ -205,6 +257,7 @@ export default function SettingsPage() {
       setSettings(updated)
       setInitialSettings(updated)
       void refreshSetupStatus(updated)
+      void refreshStorefrontStatus(updated, businessSlug)
       toast.success("Configuración guardada correctamente")
     } catch (e) {
       toast.error(getBusinessConfigApiErrorMessage(e))
@@ -227,6 +280,7 @@ export default function SettingsPage() {
       setSettings(refreshed)
       setInitialSettings(refreshed)
       void refreshSetupStatus(refreshed)
+      void refreshStorefrontStatus(refreshed, businessSlug)
       toast.success("Configuración restaurada a valores por defecto")
     } catch (e) {
       toast.error(
@@ -297,6 +351,28 @@ export default function SettingsPage() {
               />
             </div>
           ) : null}
+        </SettingsSection>
+
+        <SettingsSection
+          id="storefront"
+          title="Tienda web"
+          description="Publicá el menú y los pedidos de autoservicio en la web. Independiente del bot de WhatsApp."
+        >
+          <ToggleField
+            id="storefront-enabled"
+            label="Habilitar tienda web"
+            description="Canal independiente del bot de WhatsApp. Con esto off, el link público no está disponible."
+            checked={settings.storefront_enabled}
+            onCheckedChange={(checked) =>
+              updateSetting("storefront_enabled", checked)
+            }
+          />
+          <StorefrontSetupPanel
+            status={storefrontChecklistStatus}
+            isLoading={isStorefrontSetupLoading}
+            slug={businessSlug}
+            storefrontEnabled={settings.storefront_enabled}
+          />
         </SettingsSection>
 
         {/* Human Handoff */}

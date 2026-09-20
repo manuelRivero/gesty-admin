@@ -9,6 +9,11 @@ export type ShoppingCategoryTag =
   | "SPECIAL"
   | (string & {})
 
+export interface ShoppingMapCenter {
+  latitude: number
+  longitude: number
+}
+
 export interface ShoppingBusiness {
   id: string
   slug: string | null
@@ -17,6 +22,8 @@ export interface ShoppingBusiness {
   currencyCode: string
   isOpen?: boolean
   nextOpenText?: string | null
+  /** Solo para centrar el mapa de destino (no es la dirección del cliente). */
+  mapCenter?: ShoppingMapCenter | null
 }
 
 export interface ShoppingCategory {

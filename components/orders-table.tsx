@@ -39,6 +39,7 @@ import { OrderPaymentProofs } from "@/components/order-payment-proofs"
 import { OrderDeliveryAssignmentField } from "@/components/orders/delivery-assignment-field"
 import { cn } from "@/lib/utils"
 import { getUserRoleFromCookie } from "@/lib/auth"
+import { fetchAdminBusinessConfig } from "@/lib/requests/business-config"
 import {
   ADMIN_PATCH_ORDER_LABEL_ES,
   getNextPatchableOrderStatus,
@@ -89,10 +90,29 @@ export function OrdersTable({
   const [highlightProofId, setHighlightProofId] = useState<string | null>(null)
   const [deepLinkLoading, setDeepLinkLoading] = useState(false)
   const [canAssignDelivery, setCanAssignDelivery] = useState(false)
+  /** Delivery externo: no se asigna flota propia del local. */
+  const [ownFleetAssignment, setOwnFleetAssignment] = useState(true)
 
   useEffect(() => {
     const role = getUserRoleFromCookie()
     setCanAssignDelivery(role === "OWNER" || role === "ADMIN")
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const cfg = await fetchAdminBusinessConfig()
+        if (cancelled) return
+        // Externo excluye propio: sin UI de asignar repartidor local.
+        setOwnFleetAssignment(!cfg.external_delivery_enabled)
+      } catch {
+        if (!cancelled) setOwnFleetAssignment(true)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const handleViewDetails = (order: Order, proofId?: string | null) => {
@@ -167,6 +187,7 @@ export function OrdersTable({
       if (
         newStatus === "shipped" &&
         orderIsDeliveryFulfillment(result.order) &&
+        ownFleetAssignment &&
         !result.order.assignedDeliveryUser
       ) {
         setSelectedOrder(result.order)
@@ -280,7 +301,8 @@ export function OrdersTable({
                             {order.assignedDeliveryUser.name?.trim() ||
                               order.assignedDeliveryUser.email}
                           </span>
-                        ) : orderIsDeliveryFulfillment(order) &&
+                        ) : ownFleetAssignment &&
+                          orderIsDeliveryFulfillment(order) &&
                           order.status === "shipped" ? (
                           <span className="text-xs text-amber-600 dark:text-amber-400">
                             Sin repartidor
@@ -429,6 +451,7 @@ export function OrdersTable({
               ) : null}
 
               {orderIsDeliveryFulfillment(selectedOrder) &&
+              ownFleetAssignment &&
               (selectedOrder.status === "shipped" ||
                 selectedOrder.status === "delivered") ? (
                 <>

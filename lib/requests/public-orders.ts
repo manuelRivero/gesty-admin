@@ -10,15 +10,39 @@ export type PublicOrderLineInput = {
   notes?: string | null
 }
 
+export type PublicFulfillmentType = "TAKE_AWAY" | "DELIVERY"
+
+export type PublicDeliveryAddressInput = {
+  latitude: number
+  longitude: number
+  streetAddress: string
+  apartment?: string | null
+  neighborhood?: string | null
+  city?: string | null
+  instructions?: string | null
+}
+
 export type CreatePublicOrderInput = {
   customer: {
     name: string
     phone: string
   }
   items: PublicOrderLineInput[]
-  fulfillmentType?: "TAKE_AWAY"
+  fulfillmentType?: PublicFulfillmentType
   paymentMethod?: "cash"
   notes?: string | null
+  /** Obligatorio si `fulfillmentType === "DELIVERY"`. */
+  address?: PublicDeliveryAddressInput
+}
+
+export type PublicOrderAddressView = {
+  streetAddress: string | null
+  apartment: string | null
+  neighborhood: string | null
+  city: string | null
+  instructions: string | null
+  latitude: number | null
+  longitude: number | null
 }
 
 export type PublicOrderLineResult = {
@@ -36,9 +60,13 @@ export type CreatePublicOrderResult = {
   status: string
   paymentStatus: string
   paymentMethod: "cash"
-  fulfillmentType: "TAKE_AWAY" | string
+  fulfillmentType: PublicFulfillmentType | string
   currencyCode: string
   total: string
+  /** Fee de envío cuando el backend lo expone (DELIVERY). */
+  deliveryFee?: string | null
+  address?: PublicOrderAddressView | null
+  estimatedMinutes?: number | null
   customer: {
     id: string
     name: string | null
@@ -68,8 +96,10 @@ export class PublicOrderRequestError extends Error {
 }
 
 /**
- * Pedido de autoservicio / mostrador.
+ * Pedido storefront (retiro o envío).
  * `POST /public/businesses/:slug/orders`
+ *
+ * El total del 201 manda (revalidación server-side del fee).
  */
 export async function createPublicCounterOrder(
   slug: string,
@@ -84,6 +114,25 @@ export async function createPublicCounterOrder(
     )
   }
 
+  const fulfillmentType: PublicFulfillmentType =
+    body.fulfillmentType === "DELIVERY" ? "DELIVERY" : "TAKE_AWAY"
+
+  if (fulfillmentType === "DELIVERY") {
+    const address = body.address
+    if (
+      !address ||
+      !Number.isFinite(address.latitude) ||
+      !Number.isFinite(address.longitude) ||
+      !address.streetAddress?.trim()
+    ) {
+      throw new PublicOrderRequestError(
+        "Completá la dirección de entrega",
+        "INVALID_ADDRESS",
+        400,
+      )
+    }
+  }
+
   try {
     const { data } = await publicApi.post<CreatePublicOrderResult>(
       `${PUBLIC_BUSINESSES_PATH}/${encodeURIComponent(key)}/orders`,
@@ -93,9 +142,30 @@ export async function createPublicCounterOrder(
           phone: body.customer.phone.trim(),
         },
         items: body.items,
-        fulfillmentType: "TAKE_AWAY",
+        fulfillmentType,
         paymentMethod: "cash",
         ...(body.notes?.trim() ? { notes: body.notes.trim() } : {}),
+        ...(fulfillmentType === "DELIVERY" && body.address
+          ? {
+              address: {
+                latitude: body.address.latitude,
+                longitude: body.address.longitude,
+                streetAddress: body.address.streetAddress.trim(),
+                ...(body.address.apartment?.trim()
+                  ? { apartment: body.address.apartment.trim() }
+                  : { apartment: null }),
+                ...(body.address.neighborhood?.trim()
+                  ? { neighborhood: body.address.neighborhood.trim() }
+                  : { neighborhood: null }),
+                ...(body.address.city?.trim()
+                  ? { city: body.address.city.trim() }
+                  : {}),
+                ...(body.address.instructions?.trim()
+                  ? { instructions: body.address.instructions.trim() }
+                  : { instructions: null }),
+              },
+            }
+          : {}),
       },
     )
     return data

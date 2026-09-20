@@ -60,6 +60,8 @@ export type BusinessConfigBotPersonalityRef = {
 
 export interface AdminBusinessConfig {
   bot_enabled: boolean
+  /** Kill switch del canal web (vitrina + pedidos storefront). Independiente de `bot_enabled`. */
+  storefront_enabled: boolean
   allow_human_handoff: boolean
   human_handoff_auto_timeout_minutes: number | null
   send_idle_reminders: boolean
@@ -93,6 +95,8 @@ export type AdminBusinessConfigPatch = Partial<AdminBusinessConfig>
 function normalizeAdminBusinessConfig(data: AdminBusinessConfig): AdminBusinessConfig {
   return {
     ...data,
+    bot_enabled: data.bot_enabled ?? true,
+    storefront_enabled: data.storefront_enabled ?? false,
     // Defaults alineados a create limpio (capacidades off).
     orders_enabled: data.orders_enabled ?? false,
     checkout_enabled: data.checkout_enabled ?? false,

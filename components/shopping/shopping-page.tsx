@@ -9,10 +9,13 @@ import { Input } from "@/components/ui/input"
 import { formatMenuItemPrice } from "@/lib/format-menu-price"
 import { cn } from "@/lib/utils"
 
+import type { PublicFulfillment } from "@/lib/requests/public-fulfillment"
+
 import { CartSheet } from "./cart-sheet"
 import { CategoryTags } from "./category-tags"
 import { ProductCard } from "./product-card"
 import { ShoppingCartProvider, useShoppingCart } from "./shopping-cart-context"
+import { isDeliveryFulfillment } from "./takeaway-status"
 import type { ShoppingCatalog } from "./types"
 import { useActiveShoppingOrder } from "./use-active-shopping-order"
 
@@ -54,9 +57,11 @@ export function ShoppingLoadError({
 function ShoppingPageContent({
   catalog,
   slug,
+  fulfillment,
 }: {
   catalog: ShoppingCatalog
   slug: string
+  fulfillment: PublicFulfillment
 }) {
   const { business, categories, products } = catalog
   const [selectedCategoryId, setSelectedCategoryId] = React.useState<
@@ -87,8 +92,14 @@ function ShoppingPageContent({
   const subtotal = getSubtotal(products)
   const hasItems = itemCount > 0
   const isClosed = business.isOpen === false
-  const activeOrderReady =
-    activeOrder?.status.trim().toLowerCase() === "ready_for_pickup"
+  const activeOrderReady = (() => {
+    if (!activeOrder) return false
+    const status = activeOrder.status.trim().toLowerCase()
+    if (isDeliveryFulfillment(activeOrder.fulfillmentType)) {
+      return status === "shipped"
+    }
+    return status === "ready_for_pickup"
+  })()
 
   const emptyMessage = normalizedQuery
     ? `No encontramos productos para “${searchQuery.trim()}”.`
@@ -240,6 +251,11 @@ function ShoppingPageContent({
         onOpenChange={setCartOpen}
         products={products}
         slug={slug}
+        fulfillment={fulfillment}
+        mapCenter={
+          catalog.business.mapCenter ?? fulfillment.mapCenter ?? null
+        }
+        currencyCode={business.currencyCode}
       />
     </div>
   )
@@ -248,12 +264,21 @@ function ShoppingPageContent({
 type ShoppingPageProps = {
   catalog: ShoppingCatalog
   slug: string
+  fulfillment: PublicFulfillment
 }
 
-export function ShoppingPage({ catalog, slug }: ShoppingPageProps) {
+export function ShoppingPage({
+  catalog,
+  slug,
+  fulfillment,
+}: ShoppingPageProps) {
   return (
     <ShoppingCartProvider key={catalog.business.id}>
-      <ShoppingPageContent catalog={catalog} slug={slug} />
+      <ShoppingPageContent
+        catalog={catalog}
+        slug={slug}
+        fulfillment={fulfillment}
+      />
     </ShoppingCartProvider>
   )
 }

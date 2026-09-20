@@ -269,8 +269,30 @@ export default function MyBusinessPage() {
             placeholder="mi-restaurante"
           />
           <p className="text-sm text-muted-foreground">
-            Identificador en la URL; usá minúsculas, guiones y sin espacios.
+            Identificador en la URL pública{" "}
+            <code className="text-xs">/shopping/tu-slug</code>. Usá minúsculas,
+            guiones y sin espacios. Necesario para la tienda web en{" "}
+            <Link
+              href="/settings#storefront"
+              className="font-medium underline underline-offset-2"
+            >
+              Configuración
+            </Link>
+            .
           </p>
+          {form.slug.trim() ? (
+            <p className="text-sm text-muted-foreground">
+              Vista previa:{" "}
+              <Link
+                href={`/shopping/${encodeURIComponent(form.slug.trim())}`}
+                className="font-mono text-xs underline underline-offset-2"
+                target="_blank"
+                rel="noreferrer"
+              >
+                /shopping/{form.slug.trim()}
+              </Link>
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="biz-desc">Descripción</Label>

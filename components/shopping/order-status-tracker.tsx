@@ -3,27 +3,45 @@
 import { cn } from "@/lib/utils"
 
 import {
-  TAKEAWAY_STATUS_STEPS,
-  getTakeawayStepIndex,
-  getTakeawayStatusCopy,
+  getOrderStatusCopy,
+  getOrderStepIndex,
+  getStatusSteps,
+  type ShoppingFulfillmentMode,
 } from "./takeaway-status"
 
 type OrderStatusTrackerProps = {
   status: string
+  fulfillmentType?: string | null
 }
 
-export function OrderStatusTracker({ status }: OrderStatusTrackerProps) {
-  const copy = getTakeawayStatusCopy(status)
-  const activeIndex = getTakeawayStepIndex(status)
+function resolveMode(
+  fulfillmentType: string | null | undefined,
+): ShoppingFulfillmentMode {
+  return fulfillmentType?.trim().toUpperCase() === "DELIVERY"
+    ? "DELIVERY"
+    : "TAKE_AWAY"
+}
+
+export function OrderStatusTracker({
+  status,
+  fulfillmentType,
+}: OrderStatusTrackerProps) {
+  const mode = resolveMode(fulfillmentType)
+  const steps = getStatusSteps(mode)
+  const copy = getOrderStatusCopy(status, mode)
+  const activeIndex = getOrderStepIndex(status, mode)
   const cancelled = status.trim().toLowerCase() === "cancelled"
-  const isReady = status.trim().toLowerCase() === "ready_for_pickup"
+  const highlight =
+    mode === "TAKE_AWAY"
+      ? status.trim().toLowerCase() === "ready_for_pickup"
+      : status.trim().toLowerCase() === "shipped"
 
   return (
     <div className="space-y-5">
       <div
         className={cn(
           "rounded-xl border px-4 py-4",
-          isReady
+          highlight
             ? "border-emerald-600/40 bg-emerald-50 dark:bg-emerald-950/30"
             : "border-border bg-muted/40",
         )}
@@ -34,10 +52,10 @@ export function OrderStatusTracker({ status }: OrderStatusTrackerProps) {
 
       {cancelled ? null : (
         <ol className="space-y-0">
-          {TAKEAWAY_STATUS_STEPS.map((step, index) => {
+          {steps.map((step, index) => {
             const done = activeIndex > index
             const current = activeIndex === index
-            const stepCopy = getTakeawayStatusCopy(step)
+            const stepCopy = getOrderStatusCopy(step, mode)
             return (
               <li key={step} className="flex gap-3">
                 <div className="flex flex-col items-center">
@@ -51,7 +69,7 @@ export function OrderStatusTracker({ status }: OrderStatusTrackerProps) {
                   >
                     {index + 1}
                   </span>
-                  {index < TAKEAWAY_STATUS_STEPS.length - 1 ? (
+                  {index < steps.length - 1 ? (
                     <span
                       className={cn(
                         "my-1 w-px flex-1 min-h-6",
@@ -64,11 +82,9 @@ export function OrderStatusTracker({ status }: OrderStatusTrackerProps) {
                   <p
                     className={cn(
                       "text-sm font-medium",
-                      current
+                      current || done
                         ? "text-foreground"
-                        : done
-                          ? "text-foreground"
-                          : "text-muted-foreground",
+                        : "text-muted-foreground",
                     )}
                   >
                     {stepCopy.title}
