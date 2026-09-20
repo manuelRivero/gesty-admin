@@ -2,9 +2,10 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { ClipboardList, ShoppingBag } from "lucide-react"
+import { ClipboardList, Search, ShoppingBag, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { formatMenuItemPrice } from "@/lib/format-menu-price"
 import { cn } from "@/lib/utils"
 
@@ -61,13 +62,20 @@ function ShoppingPageContent({
   const [selectedCategoryId, setSelectedCategoryId] = React.useState<
     string | null
   >(null)
+  const [searchQuery, setSearchQuery] = React.useState("")
   const [cartOpen, setCartOpen] = React.useState(false)
   const { itemCount, getSubtotal } = useShoppingCart()
   const activeOrder = useActiveShoppingOrder(slug)
 
-  const filteredProducts = selectedCategoryId
-    ? products.filter((p) => p.categoryId === selectedCategoryId)
-    : products
+  const normalizedQuery = searchQuery.trim().toLowerCase()
+
+  const filteredProducts = products.filter((p) => {
+    if (selectedCategoryId && p.categoryId !== selectedCategoryId) return false
+    if (!normalizedQuery) return true
+    const name = p.name.toLowerCase()
+    const description = (p.description ?? "").toLowerCase()
+    return name.includes(normalizedQuery) || description.includes(normalizedQuery)
+  })
 
   const productsByCategory = categories
     .map((category) => ({
@@ -81,6 +89,13 @@ function ShoppingPageContent({
   const isClosed = business.isOpen === false
   const activeOrderReady =
     activeOrder?.status.trim().toLowerCase() === "ready_for_pickup"
+
+  const emptyMessage = normalizedQuery
+    ? `No encontramos productos para “${searchQuery.trim()}”.`
+    : selectedCategoryId
+      ? "No hay productos en esta categoría."
+      : "No hay productos disponibles."
+
 
   return (
     <div className="bg-background mx-auto flex min-h-dvh w-full max-w-lg flex-col">
@@ -144,19 +159,40 @@ function ShoppingPageContent({
             </Button>
           </div>
         </div>
-        <div className="px-4 pb-3">
+        <div className="space-y-3 px-4 pb-3">
           <CategoryTags
             categories={categories}
             selectedId={selectedCategoryId}
             onSelect={setSelectedCategoryId}
           />
+          <div className="relative">
+            <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+            <Input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Buscar productos…"
+              aria-label="Buscar productos por nombre"
+              className="h-10 pr-9 pl-9"
+            />
+            {searchQuery ? (
+              <button
+                type="button"
+                className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2.5 -translate-y-1/2 rounded-sm p-0.5"
+                aria-label="Limpiar búsqueda"
+                onClick={() => setSearchQuery("")}
+              >
+                <X className="size-4" />
+              </button>
+            ) : null}
+          </div>
         </div>
       </header>
 
       <main className={`flex-1 px-4 ${hasItems ? "pb-28" : "pb-8"}`}>
         {productsByCategory.length === 0 ? (
           <p className="text-muted-foreground py-12 text-center text-sm">
-            No hay productos en esta categoría.
+            {emptyMessage}
           </p>
         ) : (
           productsByCategory.map(({ category, products: groupProducts }) => (
