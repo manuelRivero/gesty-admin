@@ -32,7 +32,15 @@ import {
   PublicOrderRequestError,
   type CreatePublicOrderResult,
   type PublicFulfillmentType,
+  type PublicOrderPaymentMethod,
 } from "@/lib/requests/public-orders"
+import {
+  DEFAULT_PUBLIC_PAYMENT_METHODS,
+  fetchPublicPaymentMethods,
+  storefrontSelectableMethods,
+  type PublicPaymentMethod,
+  type PublicPaymentMethodsResult,
+} from "@/lib/requests/public-payment-methods"
 import { fetchPublicReverseGeocode } from "@/lib/requests/public-reverse-geocode"
 import { cn } from "@/lib/utils"
 
@@ -66,6 +74,14 @@ function defaultFulfillmentType(
   if (fulfillment.takeawayEnabled) return "TAKE_AWAY"
   if (offersPublicDelivery(fulfillment)) return "DELIVERY"
   return "TAKE_AWAY"
+}
+
+function defaultPaymentMethod(
+  methods: PublicPaymentMethod[],
+): PublicOrderPaymentMethod {
+  if (methods.some((m) => m.paymentMethod === "cash")) return "cash"
+  if (methods.some((m) => m.paymentMethod === "online")) return "online"
+  return "cash"
 }
 
 function formatSubtotalHint(subtotal: number): string {
@@ -137,6 +153,12 @@ export function CartSheet({
   /** Si el usuario edita la calle tras el autofill, no pisar hasta mover el pin. */
   const streetEditedRef = React.useRef(false)
 
+  const [paymentCatalog, setPaymentCatalog] =
+    React.useState<PublicPaymentMethodsResult>(DEFAULT_PUBLIC_PAYMENT_METHODS)
+  const [paymentMethodsLoading, setPaymentMethodsLoading] = React.useState(false)
+  const [paymentMethod, setPaymentMethod] =
+    React.useState<PublicOrderPaymentMethod>("cash")
+
   const byId = new Map(products.map((p) => [p.id, p]))
   const resolved = lines
     .map((line) => {
@@ -168,13 +190,27 @@ export function CartSheet({
       !quoteLoading &&
       !quoteError)
 
+  const selectablePayments = storefrontSelectableMethods(paymentCatalog)
+  const showPaymentPicker = selectablePayments.length > 1
+  const onlyOnlinePayment =
+    selectablePayments.length === 1 &&
+    selectablePayments[0]?.paymentMethod === "online"
+  const selectedPaymentMeta = selectablePayments.find(
+    (m) => m.paymentMethod === paymentMethod,
+  )
+  const paymentReady =
+    selectablePayments.length > 0 &&
+    selectablePayments.some((m) => m.paymentMethod === paymentMethod)
+
   const canConfirm =
     resolved.length > 0 &&
     isContactValid &&
     webCheckoutAvailable &&
+    paymentReady &&
     (!isDelivery || (Boolean(destination) && streetOk && quoteOk)) &&
     !submitting &&
-    !placedOrder
+    !placedOrder &&
+    !paymentMethodsLoading
 
   const deliveryFeeDisplay =
     isDelivery && quote?.inCoverage && quote.deliveryFee != null
@@ -189,6 +225,36 @@ export function CartSheet({
   React.useEffect(() => {
     setFulfillmentType(defaultFulfillmentType(fulfillment))
   }, [fulfillment])
+
+  React.useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    void (async () => {
+      setPaymentMethodsLoading(true)
+      try {
+        const result = await fetchPublicPaymentMethods(slug)
+        if (cancelled) return
+        const catalog = result ?? DEFAULT_PUBLIC_PAYMENT_METHODS
+        const selectable = storefrontSelectableMethods(catalog)
+        setPaymentCatalog(
+          selectable.length > 0 ? catalog : DEFAULT_PUBLIC_PAYMENT_METHODS,
+        )
+        const next = defaultPaymentMethod(
+          selectable.length > 0 ? selectable : DEFAULT_PUBLIC_PAYMENT_METHODS.paymentMethods,
+        )
+        setPaymentMethod(next)
+      } catch {
+        if (cancelled) return
+        setPaymentCatalog(DEFAULT_PUBLIC_PAYMENT_METHODS)
+        setPaymentMethod("cash")
+      } finally {
+        if (!cancelled) setPaymentMethodsLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [open, slug])
 
   React.useEffect(() => {
     if (!isDelivery || !destination || !open) return
@@ -289,7 +355,8 @@ export function CartSheet({
       !isContactValid ||
       submitting ||
       resolved.length === 0 ||
-      placedOrder
+      placedOrder ||
+      !paymentReady
     ) {
       return
     }
@@ -307,7 +374,7 @@ export function CartSheet({
           quantity: line.quantity,
         })),
         fulfillmentType,
-        paymentMethod: "cash",
+        paymentMethod,
         ...(isDelivery && destination
           ? {
               address: {
@@ -324,6 +391,24 @@ export function CartSheet({
       })
       clear()
       writeActiveShoppingOrder(slug, order)
+
+      const checkoutUrl = order.checkoutUrl?.trim()
+      if (paymentMethod === "online" && checkoutUrl) {
+        toast.success("Redirigiendo a Mercado Pago…")
+        window.location.assign(checkoutUrl)
+        return
+      }
+
+      if (paymentMethod === "online") {
+        toast.message("Pedido creado", {
+          description: "Abrí el seguimiento para completar el pago.",
+        })
+        window.location.assign(
+          `/shopping/${encodeURIComponent(slug)}/orders/${encodeURIComponent(order.orderId)}?payment=pending`,
+        )
+        return
+      }
+
       setPlacedOrder(order)
       toast.success("Pedido enviado", {
         description: "Seguí el estado desde el ícono de pedidos.",
@@ -357,6 +442,9 @@ export function CartSheet({
     setLocating(false)
     streetEditedRef.current = false
     setFulfillmentType(defaultFulfillmentType(fulfillment))
+    setPaymentMethod(
+      defaultPaymentMethod(storefrontSelectableMethods(paymentCatalog)),
+    )
   }
 
   function handleOpenChange(next: boolean) {
@@ -450,7 +538,7 @@ export function CartSheet({
             <SheetFooter className="border-t gap-2 p-4">
               <Button type="button" size="lg" className="w-full" asChild>
                 <Link
-                  href={`/shopping/${encodeURIComponent(slug)}/order/${encodeURIComponent(placedOrder.orderId)}`}
+                  href={`/shopping/${encodeURIComponent(slug)}/orders/${encodeURIComponent(placedOrder.orderId)}`}
                 >
                   Ver estado del pedido
                 </Link>
@@ -782,6 +870,59 @@ export function CartSheet({
                       ) : null}
                     </div>
                   </div>
+
+                  <div className="space-y-3 border-t pt-4 pb-2">
+                    <p className="text-sm font-medium">¿Cómo pagás?</p>
+                    {paymentMethodsLoading ? (
+                      <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                        <Loader2 className="size-4 animate-spin" />
+                        Cargando formas de pago…
+                      </div>
+                    ) : showPaymentPicker ? (
+                      <RadioGroup
+                        value={paymentMethod}
+                        onValueChange={(v) =>
+                          setPaymentMethod(v as PublicOrderPaymentMethod)
+                        }
+                        className="grid grid-cols-2 gap-2"
+                        disabled={submitting}
+                      >
+                        {selectablePayments.map((method) => (
+                          <PaymentModeOption
+                            key={method.paymentMethod}
+                            method={method}
+                            selected={paymentMethod === method.paymentMethod}
+                          />
+                        ))}
+                      </RadioGroup>
+                    ) : onlyOnlinePayment ? (
+                      <div className="bg-muted/40 rounded-lg border px-3 py-2.5 text-sm">
+                        <p className="font-medium">
+                          {selectedPaymentMeta?.label ?? "Pago online"}
+                        </p>
+                        <p className="text-muted-foreground mt-0.5 text-xs">
+                          Te redirigimos a Mercado Pago para pagar con tarjeta
+                          o dinero en cuenta.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="bg-muted/40 rounded-lg border px-3 py-2.5 text-sm">
+                        <p className="font-medium">
+                          {selectedPaymentMeta?.label ?? "Efectivo"}
+                        </p>
+                        <p className="text-muted-foreground mt-0.5 text-xs">
+                          {isDelivery
+                            ? "Pagás al recibir el pedido."
+                            : "Pagás en el mostrador al retirar."}
+                        </p>
+                      </div>
+                    )}
+                    {selectedPaymentMeta?.instructions ? (
+                      <p className="text-muted-foreground text-xs">
+                        {selectedPaymentMeta.instructions}
+                      </p>
+                    ) : null}
+                  </div>
                 </>
               )}
             </div>
@@ -826,8 +967,12 @@ export function CartSheet({
                   {submitting ? (
                     <>
                       <Loader2 className="size-4 animate-spin" />
-                      Enviando…
+                      {paymentMethod === "online"
+                        ? "Abriendo pago…"
+                        : "Enviando…"}
                     </>
+                  ) : paymentMethod === "online" ? (
+                    "Pagar con Mercado Pago"
                   ) : (
                     "Confirmar pedido"
                   )}
@@ -886,6 +1031,40 @@ function ModeOption({
         <span className="text-sm font-semibold">{label}</span>
       </div>
       <span className="text-muted-foreground pl-6 text-xs">{description}</span>
+    </Label>
+  )
+}
+
+function PaymentModeOption({
+  method,
+  selected,
+}: {
+  method: PublicPaymentMethod
+  selected: boolean
+}) {
+  const isOnline = method.paymentMethod === "online"
+  return (
+    <Label
+      htmlFor={`payment-${method.paymentMethod}`}
+      className={cn(
+        "flex min-h-16 cursor-pointer flex-col justify-center gap-0.5 rounded-lg border px-3 py-3 transition-colors",
+        selected
+          ? "border-foreground bg-muted/50 ring-1 ring-foreground"
+          : "border-border hover:bg-muted/30",
+      )}
+    >
+      <div className="flex items-center gap-2">
+        <RadioGroupItem
+          value={method.paymentMethod}
+          id={`payment-${method.paymentMethod}`}
+        />
+        <span className="text-sm font-semibold">{method.label}</span>
+      </div>
+      <span className="text-muted-foreground pl-6 text-xs">
+        {isOnline
+          ? "Mercado Pago ahora"
+          : "En el local o al recibir"}
+      </span>
     </Label>
   )
 }

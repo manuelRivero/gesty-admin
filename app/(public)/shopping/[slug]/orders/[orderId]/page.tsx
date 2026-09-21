@@ -4,13 +4,13 @@ import { Loader2 } from "lucide-react"
 
 import { ShoppingOrderDetail } from "@/components/shopping/order-detail-page"
 
-type ShoppingOrderPageProps = {
+type ShoppingOrdersPageProps = {
   params: Promise<{ slug: string; orderId: string }>
 }
 
 export async function generateMetadata({
   params,
-}: ShoppingOrderPageProps): Promise<Metadata> {
+}: ShoppingOrdersPageProps): Promise<Metadata> {
   const { orderId } = await params
   return {
     title: `Pedido · ${orderId.slice(0, 8)}`,
@@ -18,10 +18,9 @@ export async function generateMetadata({
   }
 }
 
-/** Alias legacy (`/order/`); MP back_urls usan `/orders/`. */
-export default async function ShoppingOrderPage({
+export default async function ShoppingOrdersPage({
   params,
-}: ShoppingOrderPageProps) {
+}: ShoppingOrdersPageProps) {
   const { slug, orderId } = await params
   return (
     <Suspense

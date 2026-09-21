@@ -138,7 +138,7 @@ function ShoppingPageContent({
                 asChild
               >
                 <Link
-                  href={`/shopping/${encodeURIComponent(slug)}/order/${encodeURIComponent(activeOrder.orderId)}`}
+                  href={`/shopping/${encodeURIComponent(slug)}/orders/${encodeURIComponent(activeOrder.orderId)}`}
                   aria-label="Ver estado del pedido"
                 >
                   <ClipboardList className="size-5" />

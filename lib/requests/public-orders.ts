@@ -22,6 +22,8 @@ export type PublicDeliveryAddressInput = {
   instructions?: string | null
 }
 
+export type PublicOrderPaymentMethod = "cash" | "online"
+
 export type CreatePublicOrderInput = {
   customer: {
     name: string
@@ -29,7 +31,8 @@ export type CreatePublicOrderInput = {
   }
   items: PublicOrderLineInput[]
   fulfillmentType?: PublicFulfillmentType
-  paymentMethod?: "cash"
+  /** Solo `cash` | `online` (nunca transfer por este canal). */
+  paymentMethod?: PublicOrderPaymentMethod
   notes?: string | null
   /** Obligatorio si `fulfillmentType === "DELIVERY"`. */
   address?: PublicDeliveryAddressInput
@@ -59,13 +62,18 @@ export type CreatePublicOrderResult = {
   orderId: string
   status: string
   paymentStatus: string
-  paymentMethod: "cash"
+  paymentMethod: PublicOrderPaymentMethod | string
   fulfillmentType: PublicFulfillmentType | string
   currencyCode: string
   total: string
   /** Fee de envío cuando el backend lo expone (DELIVERY). */
   deliveryFee?: string | null
   address?: PublicOrderAddressView | null
+  /**
+   * init_point MP si online unpaid; null en cash o ya paid.
+   * El 201.total manda (incluye ajuste de método si hay).
+   */
+  checkoutUrl?: string | null
   estimatedMinutes?: number | null
   customer: {
     id: string
@@ -74,6 +82,11 @@ export type CreatePublicOrderResult = {
   }
   items: PublicOrderLineResult[]
   createdAt: string
+}
+
+export type PublicOrderCheckoutResult = {
+  orderId: string
+  checkoutUrl: string
 }
 
 export class PublicOrderRequestError extends Error {
@@ -116,6 +129,8 @@ export async function createPublicCounterOrder(
 
   const fulfillmentType: PublicFulfillmentType =
     body.fulfillmentType === "DELIVERY" ? "DELIVERY" : "TAKE_AWAY"
+  const paymentMethod: PublicOrderPaymentMethod =
+    body.paymentMethod === "online" ? "online" : "cash"
 
   if (fulfillmentType === "DELIVERY") {
     const address = body.address
@@ -143,7 +158,7 @@ export async function createPublicCounterOrder(
         },
         items: body.items,
         fulfillmentType,
-        paymentMethod: "cash",
+        paymentMethod,
         ...(body.notes?.trim() ? { notes: body.notes.trim() } : {}),
         ...(fulfillmentType === "DELIVERY" && body.address
           ? {
@@ -169,6 +184,47 @@ export async function createPublicCounterOrder(
       },
     )
     return data
+  } catch (error) {
+    throw mapPublicOrderAxiosError(error)
+  }
+}
+
+/**
+ * Re-emite (o reusa) el link MP de una orden storefront unpaid + online.
+ * `POST /public/businesses/:slug/orders/:orderId/checkout`
+ *
+ * Errores: `ALREADY_PAID` (409) · `CHECKOUT_UNAVAILABLE` (503) ·
+ * `ONLINE_PAYMENT_UNAVAILABLE` (403) · `NOT_ONLINE_ORDER` (400).
+ */
+export async function createPublicOrderCheckout(
+  slug: string,
+  orderId: string,
+): Promise<PublicOrderCheckoutResult> {
+  const businessKey = slug.trim()
+  const id = orderId.trim()
+  if (!businessKey || !id) {
+    throw new PublicOrderRequestError(
+      "Pedido no encontrado",
+      "ORDER_NOT_FOUND",
+      404,
+    )
+  }
+
+  try {
+    const { data } = await publicApi.post<PublicOrderCheckoutResult>(
+      `${PUBLIC_BUSINESSES_PATH}/${encodeURIComponent(businessKey)}/orders/${encodeURIComponent(id)}/checkout`,
+    )
+    if (!data?.checkoutUrl?.trim()) {
+      throw new PublicOrderRequestError(
+        "No se pudo abrir el pago online",
+        "CHECKOUT_UNAVAILABLE",
+        503,
+      )
+    }
+    return {
+      orderId: data.orderId?.trim() || id,
+      checkoutUrl: data.checkoutUrl.trim(),
+    }
   } catch (error) {
     throw mapPublicOrderAxiosError(error)
   }
