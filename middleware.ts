@@ -18,8 +18,21 @@ function isPublicPath(pathname: string): boolean {
   )
 }
 
+/** Dominio exclusivo de la tienda pública (ej. tienda.tudominio.com). Si no se define, no se restringe nada. */
+const SHOP_HOST = process.env.NEXT_PUBLIC_SHOP_HOST?.trim().toLowerCase()
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
+
+  if (SHOP_HOST && request.headers.get("host")?.toLowerCase() === SHOP_HOST) {
+    if (pathname === "/") {
+      return NextResponse.redirect(new URL("/shopping", request.url))
+    }
+    if (!isPublicPath(pathname) && !pathname.startsWith("/api")) {
+      return new NextResponse("Not found", { status: 404 })
+    }
+    return NextResponse.next()
+  }
 
   if (pathname.startsWith("/api")) {
     return NextResponse.next()
