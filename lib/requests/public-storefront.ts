@@ -6,6 +6,7 @@ import type {
   ShoppingCatalog,
   ShoppingCategory,
   ShoppingProduct,
+  ShoppingStorefrontSummary,
 } from "@/components/shopping/types"
 import { publicApi } from "@/lib/api"
 import { resolveMenuItemImageUrl } from "@/lib/menu-item-image"
@@ -259,6 +260,59 @@ async function fetchPublicStorefrontMenuUncached(
 export const fetchPublicStorefrontMenu = cache(
   async (slug: string, availableOnly = true): Promise<ShoppingCatalog> =>
     fetchPublicStorefrontMenuUncached(slug, { availableOnly }),
+)
+
+type PublicStorefrontSummaryRaw = {
+  id?: string
+  name?: string | null
+  slug?: string | null
+  tagline?: string | null
+  description?: string | null
+  category?: string | null
+  imageUrl?: string | null
+  isOpen?: boolean
+  nextOpenText?: string | null
+}
+
+function mapStorefrontSummary(
+  raw: PublicStorefrontSummaryRaw,
+): ShoppingStorefrontSummary | null {
+  const id = raw.id?.trim()
+  const slug = raw.slug?.trim()
+  const name = raw.name?.trim()
+  if (!id || !slug || !name) return null
+
+  const tagline =
+    (typeof raw.tagline === "string" && raw.tagline.trim()) ||
+    (typeof raw.description === "string" && raw.description.trim()) ||
+    null
+
+  return {
+    id,
+    slug,
+    name,
+    tagline,
+    category: typeof raw.category === "string" ? raw.category : null,
+    imageUrl: raw.imageUrl ?? null,
+    isOpen: typeof raw.isOpen === "boolean" ? raw.isOpen : undefined,
+    nextOpenText: raw.nextOpenText ?? null,
+  }
+}
+
+/**
+ * Vitrina global de Shopping (sin elegir local todavía).
+ * `GET /public/businesses`
+ */
+export const fetchPublicStorefronts = cache(
+  async (): Promise<ShoppingStorefrontSummary[]> => {
+    const { data } = await publicApi.get<{
+      businesses?: PublicStorefrontSummaryRaw[]
+    }>(PUBLIC_BUSINESSES_PATH)
+
+    return (data.businesses ?? [])
+      .map(mapStorefrontSummary)
+      .filter((b): b is ShoppingStorefrontSummary => Boolean(b))
+  },
 )
 
 export async function fetchPublicStorefrontProfile(

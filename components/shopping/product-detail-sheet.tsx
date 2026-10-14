@@ -21,6 +21,8 @@ type ProductDetailSheetProps = {
   product: ShoppingProduct | null
   open: boolean
   onOpenChange: (open: boolean) => void
+  /** El local no está aceptando pedidos en este momento (fuera de horario). */
+  orderingDisabled?: boolean
 }
 
 function formatServesPeople(n: number): string {
@@ -31,6 +33,7 @@ export function ProductDetailSheet({
   product,
   open,
   onOpenChange,
+  orderingDisabled = false,
 }: ProductDetailSheetProps) {
   const { getQuantity, addProduct, increment, decrement } = useShoppingCart()
 
@@ -166,6 +169,10 @@ export function ProductDetailSheet({
           {unavailable ? (
             <Button type="button" disabled className="w-full">
               No disponible
+            </Button>
+          ) : orderingDisabled ? (
+            <Button type="button" disabled className="w-full">
+              No disponible ahora
             </Button>
           ) : quantity === 0 ? (
             <Button

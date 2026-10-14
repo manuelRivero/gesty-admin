@@ -2,7 +2,14 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { ClipboardList, Search, ShoppingBag, X } from "lucide-react"
+import {
+  ArrowLeft,
+  ClipboardList,
+  Clock,
+  Search,
+  ShoppingBag,
+  X,
+} from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -54,6 +61,28 @@ export function ShoppingLoadError({
   )
 }
 
+function ShoppingClosedNotice({
+  nextOpenText,
+}: {
+  nextOpenText?: string | null
+}) {
+  return (
+    <div className="flex flex-col items-center gap-3 py-16 text-center">
+      <Clock className="text-muted-foreground size-10" />
+      <div className="space-y-1">
+        <p className="font-semibold tracking-tight">
+          Este local está cerrado por el momento
+        </p>
+        <p className="text-muted-foreground text-sm">
+          {nextOpenText
+            ? `Volvemos a abrir ${nextOpenText}.`
+            : "No está recibiendo pedidos en este momento."}
+        </p>
+      </div>
+    </div>
+  )
+}
+
 function ShoppingPageContent({
   catalog,
   slug,
@@ -92,6 +121,8 @@ function ShoppingPageContent({
   const subtotal = getSubtotal(products)
   const hasItems = itemCount > 0
   const isClosed = business.isOpen === false
+  const storeHidden = isClosed && !fulfillment.operateWhenClosed
+  const checkoutBlockedByHours = isClosed && !fulfillment.ordersWhenClosed
   const activeOrderReady = (() => {
     if (!activeOrder) return false
     const status = activeOrder.status.trim().toLowerCase()
@@ -112,21 +143,37 @@ function ShoppingPageContent({
     <div className="bg-background mx-auto flex min-h-dvh w-full max-w-lg flex-col">
       <header className="bg-background/95 sticky top-0 z-20 border-b backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="flex items-start justify-between gap-3 px-4 pt-4 pb-3">
-          <div className="min-w-0">
-            <h1 className="truncate text-xl font-semibold tracking-tight">
-              {business.name}
-            </h1>
-            {business.tagline ? (
-              <p className="text-muted-foreground text-sm">{business.tagline}</p>
-            ) : null}
-            {isClosed ? (
-              <p className="text-muted-foreground mt-1 text-xs">
-                Cerrado ahora
-                {business.nextOpenText
-                  ? ` · ${business.nextOpenText}`
-                  : null}
-              </p>
-            ) : null}
+          <div className="flex min-w-0 items-start gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="mt-0.5 shrink-0"
+              aria-label="Volver a todos los locales"
+              asChild
+            >
+              <Link href="/shopping">
+                <ArrowLeft className="size-5" />
+              </Link>
+            </Button>
+            <div className="min-w-0">
+              <h1 className="truncate text-xl font-semibold tracking-tight">
+                {business.name}
+              </h1>
+              {business.tagline ? (
+                <p className="text-muted-foreground text-sm">
+                  {business.tagline}
+                </p>
+              ) : null}
+              {isClosed ? (
+                <p className="text-muted-foreground mt-1 text-xs">
+                  Cerrado ahora
+                  {business.nextOpenText
+                    ? ` · ${business.nextOpenText}`
+                    : null}
+                </p>
+              ) : null}
+            </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {activeOrder ? (
@@ -201,7 +248,9 @@ function ShoppingPageContent({
       </header>
 
       <main className={`flex-1 px-4 ${hasItems ? "pb-28" : "pb-8"}`}>
-        {productsByCategory.length === 0 ? (
+        {storeHidden ? (
+          <ShoppingClosedNotice nextOpenText={business.nextOpenText} />
+        ) : productsByCategory.length === 0 ? (
           <p className="text-muted-foreground py-12 text-center text-sm">
             {emptyMessage}
           </p>
@@ -215,7 +264,11 @@ function ShoppingPageContent({
               ) : null}
               <div>
                 {groupProducts.map((product) => (
-                  <ProductCard key={product.id} product={product} />
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    orderingDisabled={checkoutBlockedByHours}
+                  />
                 ))}
               </div>
             </section>
@@ -252,6 +305,7 @@ function ShoppingPageContent({
         products={products}
         slug={slug}
         fulfillment={fulfillment}
+        checkoutBlockedByHours={checkoutBlockedByHours}
         mapCenter={
           catalog.business.mapCenter ?? fulfillment.mapCenter ?? null
         }

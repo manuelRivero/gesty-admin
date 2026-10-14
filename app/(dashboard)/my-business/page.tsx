@@ -9,6 +9,13 @@ import { Loader2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { SettingsSection } from "@/components/settings/settings-section"
 import {
@@ -16,6 +23,11 @@ import {
   SettingsFormFooter,
 } from "@/components/settings/settings-form-footer"
 import { useUnsavedChangesToast } from "@/hooks/use-unsaved-changes-toast"
+import {
+  BUSINESS_CATEGORY_FALLBACK,
+  type BusinessCategoryOption,
+} from "@/lib/business-categories"
+import { fetchBusinessCategories } from "@/lib/requests/business-categories"
 import { fetchAdminBusinessConfig } from "@/lib/requests/business-config"
 import {
   fetchAdminBusinessProfile,
@@ -41,10 +53,14 @@ function parseOptionalCoord(raw: string): number | null | "invalid" {
   return Number.isFinite(n) ? n : "invalid"
 }
 
+/** Sentinel de UI para "sin categoría": Radix Select no admite value="". */
+const NO_CATEGORY = "NONE"
+
 type FormState = {
   name: string
   slug: string
   description: string
+  category: string
   street_address: string
   address_notes: string
   latitudeStr: string
@@ -57,6 +73,7 @@ function profileToForm(p: AdminBusinessProfile): FormState {
     name: p.name ?? "",
     slug: normText(p.slug),
     description: p.description ?? "",
+    category: p.category ?? NO_CATEGORY,
     street_address: p.street_address ?? "",
     address_notes: p.address_notes ?? "",
     latitudeStr: p.latitude != null ? String(p.latitude) : "",
@@ -83,6 +100,11 @@ function buildPatch(
   const descInitial = normText(initial.description)
   if (descForm !== descInitial) {
     patch.description = descForm === "" ? null : descForm
+  }
+
+  const categoryForm = form.category === NO_CATEGORY ? null : form.category
+  if (categoryForm !== (initial.category ?? null)) {
+    patch.category = categoryForm
   }
 
   const streetForm = form.street_address.trim()
@@ -121,20 +143,25 @@ export default function MyBusinessPage() {
   const [initialProfile, setInitialProfile] = useState<AdminBusinessProfile | null>(null)
   const [form, setForm] = useState<FormState | null>(null)
   const [takeawayEnabled, setTakeawayEnabled] = useState(false)
+  const [categoryOptions, setCategoryOptions] = useState<
+    BusinessCategoryOption[]
+  >(BUSINESS_CATEGORY_FALLBACK)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [business, config] = await Promise.all([
+      const [business, config, categories] = await Promise.all([
         fetchAdminBusinessProfile(),
         fetchAdminBusinessConfig(),
+        fetchBusinessCategories(),
       ])
       setProfile(business)
       setInitialProfile(business)
       setForm(profileToForm(business))
       setTakeawayEnabled(Boolean(config.takeaway_enabled))
+      setCategoryOptions(categories)
     } catch (e) {
       toast.error(errorMessage(e, "No se pudo cargar la información del negocio."))
     } finally {
@@ -306,6 +333,29 @@ export default function MyBusinessPage() {
           />
           <p className="text-sm text-muted-foreground">
             Si guardás el campo vacío, se borra la descripción en el servidor.
+          </p>
+        </div>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="biz-category">Categoría</Label>
+          <Select
+            value={form.category}
+            onValueChange={(value) => updateForm("category", value)}
+          >
+            <SelectTrigger id="biz-category" className="w-full sm:w-64">
+              <SelectValue placeholder="Elegí una categoría" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NO_CATEGORY}>Sin categoría</SelectItem>
+              {categoryOptions.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-sm text-muted-foreground">
+            Se usa para mostrar tu local en la categoría correspondiente del
+            home de Shopping.
           </p>
         </div>
       </SettingsSection>

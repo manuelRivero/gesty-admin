@@ -64,6 +64,8 @@ type CartSheetProps = {
   /** Slug o UUID de la URL (`/shopping/[slug]`). */
   slug: string
   fulfillment: PublicFulfillment
+  /** El local está fuera de horario y no acepta pedidos ahora mismo. */
+  checkoutBlockedByHours?: boolean
   mapCenter?: ShoppingMapCenter | null
   currencyCode: string
 }
@@ -94,6 +96,7 @@ export function CartSheet({
   products,
   slug,
   fulfillment,
+  checkoutBlockedByHours = false,
   mapCenter,
   currencyCode,
 }: CartSheetProps) {
@@ -210,7 +213,8 @@ export function CartSheet({
     (!isDelivery || (Boolean(destination) && streetOk && quoteOk)) &&
     !submitting &&
     !placedOrder &&
-    !paymentMethodsLoading
+    !paymentMethodsLoading &&
+    !checkoutBlockedByHours
 
   const deliveryFeeDisplay =
     isDelivery && quote?.inCoverage && quote.deliveryFee != null
@@ -356,7 +360,8 @@ export function CartSheet({
       submitting ||
       resolved.length === 0 ||
       placedOrder ||
-      !paymentReady
+      !paymentReady ||
+      checkoutBlockedByHours
     ) {
       return
     }
@@ -957,6 +962,17 @@ export function CartSheet({
                   ) : null}
                 </div>
                 <Separator />
+                {checkoutBlockedByHours ? (
+                  <div className="rounded-lg border border-amber-600/30 bg-amber-50 px-3 py-2.5 text-sm dark:bg-amber-950/30">
+                    <p className="font-medium">
+                      El local está cerrado por el momento
+                    </p>
+                    <p className="text-muted-foreground mt-0.5 text-xs">
+                      Tu carrito queda guardado, pero por ahora no podés
+                      confirmar el pago. Probá de nuevo cuando vuelva a abrir.
+                    </p>
+                  </div>
+                ) : null}
                 <Button
                   type="button"
                   size="lg"
@@ -977,7 +993,7 @@ export function CartSheet({
                     "Confirmar pedido"
                   )}
                 </Button>
-                {!isContactValid ? (
+                {checkoutBlockedByHours ? null : !isContactValid ? (
                   <p className="text-muted-foreground text-center text-xs">
                     Completá nombre y teléfono para continuar.
                   </p>

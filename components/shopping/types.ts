@@ -56,6 +56,19 @@ export interface ShoppingCatalog {
   products: ShoppingProduct[]
 }
 
+/** Entrada de la vitrina global (`/shopping`), antes de elegir un local. */
+export interface ShoppingStorefrontSummary {
+  id: string
+  slug: string
+  name: string
+  tagline: string | null
+  /** Código fijo (ver `BUSINESS_CATEGORY_OPTIONS`), null = sin categoría. */
+  category: string | null
+  imageUrl: string | null
+  isOpen?: boolean
+  nextOpenText?: string | null
+}
+
 export interface CartLine {
   productId: string
   quantity: number

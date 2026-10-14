@@ -13,9 +13,14 @@ import type { ShoppingProduct } from "./types"
 
 type ProductCardProps = {
   product: ShoppingProduct
+  /** El local no está aceptando pedidos en este momento (fuera de horario). */
+  orderingDisabled?: boolean
 }
 
-export function ProductCard({ product }: ProductCardProps) {
+export function ProductCard({
+  product,
+  orderingDisabled = false,
+}: ProductCardProps) {
   const { getQuantity, addProduct, increment, decrement } = useShoppingCart()
   const [detailOpen, setDetailOpen] = React.useState(false)
   const quantity = getQuantity(product.id)
@@ -72,7 +77,11 @@ export function ProductCard({ product }: ProductCardProps) {
           </button>
 
           <div className="mt-auto flex justify-end">
-            {unavailable ? null : quantity === 0 ? (
+            {unavailable ? null : orderingDisabled ? (
+              <span className="text-muted-foreground text-xs">
+                No disponible ahora
+              </span>
+            ) : quantity === 0 ? (
               <Button
                 type="button"
                 size="sm"
@@ -116,6 +125,7 @@ export function ProductCard({ product }: ProductCardProps) {
         product={product}
         open={detailOpen}
         onOpenChange={setDetailOpen}
+        orderingDisabled={orderingDisabled}
       />
     </>
   )

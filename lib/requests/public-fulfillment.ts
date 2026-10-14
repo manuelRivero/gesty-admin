@@ -20,6 +20,10 @@ export type PublicFulfillment = {
   externalDeliveryEnabled: boolean
   takeawayEnabled: boolean
   pickupInstructions: string | null
+  /** El negocio acepta pedidos aunque esté fuera de horario (config explícita). */
+  ordersWhenClosed: boolean
+  /** El local opera (muestra catálogo) aunque esté fuera de horario. */
+  operateWhenClosed: boolean
   /** Viewport del mapa de destino; nunca es la dirección del cliente. */
   mapCenter: PublicMapCenter | null
 }
@@ -37,6 +41,10 @@ type PublicFulfillmentRaw = {
   external_delivery_enabled?: boolean
   pickupInstructions?: string | null
   pickup_instructions?: string | null
+  ordersWhenClosed?: boolean
+  orders_when_closed?: boolean
+  operateWhenClosed?: boolean
+  operate_when_closed?: boolean
   mapCenter?: {
     latitude?: number | null
     longitude?: number | null
@@ -93,6 +101,8 @@ export function mapPublicFulfillment(
       (typeof raw.pickup_instructions === "string"
         ? raw.pickup_instructions
         : null),
+    ordersWhenClosed: asBool(raw.ordersWhenClosed, raw.orders_when_closed),
+    operateWhenClosed: asBool(raw.operateWhenClosed, raw.operate_when_closed),
     mapCenter:
       parseMapCenter(raw.mapCenter) ??
       parseMapCenter(raw.map_center) ??
@@ -143,5 +153,7 @@ export const DEFAULT_PUBLIC_FULFILLMENT: PublicFulfillment = {
   externalDeliveryEnabled: false,
   takeawayEnabled: true,
   pickupInstructions: null,
+  ordersWhenClosed: false,
+  operateWhenClosed: false,
   mapCenter: null,
 }

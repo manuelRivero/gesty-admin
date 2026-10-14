@@ -13,6 +13,7 @@ export interface AdminBusinessProfile {
   longitude: number | null
   timezone: string
   slug: string | null
+  category: string | null
   currency_code: string
   is_active: boolean
 }
@@ -26,6 +27,7 @@ export type AdminBusinessProfilePatch = Partial<{
   longitude: number | null
   timezone: string
   slug: string
+  category: string | null
 }>
 
 export async function fetchAdminBusinessProfile(): Promise<AdminBusinessProfile> {

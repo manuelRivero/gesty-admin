@@ -1,11 +1,39 @@
-export default function ShoppingIndexPage() {
-  return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-lg flex-col items-center justify-center gap-2 px-6 text-center">
-      <h1 className="text-xl font-semibold tracking-tight">Elegí un local</h1>
-      <p className="text-muted-foreground text-sm">
-        Abrí el link con el slug del negocio, por ejemplo{" "}
-        <code className="text-foreground text-xs">/shopping/tu-local</code>.
-      </p>
-    </div>
-  )
+import type { Metadata } from "next"
+import { isAxiosError } from "axios"
+
+import {
+  ShoppingMarketplaceLoadError,
+  ShoppingMarketplacePage,
+} from "@/components/shopping/marketplace/marketplace-page"
+import { fetchBusinessCategories } from "@/lib/requests/business-categories"
+import { fetchPublicStorefronts } from "@/lib/requests/public-storefront"
+
+export const metadata: Metadata = {
+  title: "Gesty Shopping",
+  description: "Descubrí locales y armá tu pedido online.",
+}
+
+/** Estado abierto/cerrado cambia por local y por hora: nunca cachear estático. */
+export const dynamic = "force-dynamic"
+
+export default async function ShoppingIndexPage() {
+  try {
+    const [businesses, categoryOptions] = await Promise.all([
+      fetchPublicStorefronts(),
+      fetchBusinessCategories(),
+    ])
+    return (
+      <ShoppingMarketplacePage
+        businesses={businesses}
+        categoryOptions={categoryOptions}
+      />
+    )
+  } catch (error) {
+    const message = isAxiosError(error)
+      ? error.message
+      : error instanceof Error
+        ? error.message
+        : undefined
+    return <ShoppingMarketplaceLoadError message={message} />
+  }
 }
