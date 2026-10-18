@@ -122,6 +122,7 @@ function mapBusiness(raw: PublicBusinessRaw): ShoppingBusiness {
     name: String(raw.name ?? "Local").trim() || "Local",
     tagline,
     currencyCode: (raw.currencyCode ?? raw.currency_code)?.trim() || "UYU",
+    imageUrl: raw.imageUrl ?? null,
     isOpen: typeof raw.isOpen === "boolean" ? raw.isOpen : undefined,
     nextOpenText: raw.nextOpenText ?? null,
     mapCenter:

@@ -8,6 +8,7 @@ import {
   Clock,
   Search,
   ShoppingBag,
+  Store,
   X,
 } from "lucide-react"
 
@@ -121,8 +122,14 @@ function ShoppingPageContent({
   const subtotal = getSubtotal(products)
   const hasItems = itemCount > 0
   const isClosed = business.isOpen === false
-  const storeHidden = isClosed && !fulfillment.operateWhenClosed
-  const checkoutBlockedByHours = isClosed && !fulfillment.ordersWhenClosed
+  /**
+   * `operateWhenClosed`/`ordersWhenClosed` son toggles pensados para el bot
+   * de WhatsApp (atender conversaciones o tomar pedidos fuera de horario).
+   * Shopping no los hereda: un local cerrado siempre oculta el catálogo y
+   * bloquea el checkout, igual que apps de delivery de referencia.
+   */
+  const storeHidden = isClosed
+  const checkoutBlockedByHours = isClosed
   const activeOrderReady = (() => {
     if (!activeOrder) return false
     const status = activeOrder.status.trim().toLowerCase()
@@ -156,6 +163,17 @@ function ShoppingPageContent({
                 <ArrowLeft className="size-5" />
               </Link>
             </Button>
+            <div className="bg-muted mt-0.5 flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full">
+              {business.imageUrl ? (
+                <img
+                  src={business.imageUrl}
+                  alt=""
+                  className="size-full object-cover"
+                />
+              ) : (
+                <Store className="text-muted-foreground size-5" />
+              )}
+            </div>
             <div className="min-w-0">
               <h1 className="truncate text-xl font-semibold tracking-tight">
                 {business.name}
@@ -217,34 +235,36 @@ function ShoppingPageContent({
             </Button>
           </div>
         </div>
-        <div className="space-y-3 px-4 pb-3">
-          <CategoryTags
-            categories={categories}
-            selectedId={selectedCategoryId}
-            onSelect={setSelectedCategoryId}
-          />
-          <div className="relative">
-            <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-            <Input
-              type="search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar productos…"
-              aria-label="Buscar productos por nombre"
-              className="h-10 pr-9 pl-9"
+        {storeHidden ? null : (
+          <div className="space-y-3 px-4 pb-3">
+            <CategoryTags
+              categories={categories}
+              selectedId={selectedCategoryId}
+              onSelect={setSelectedCategoryId}
             />
-            {searchQuery ? (
-              <button
-                type="button"
-                className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2.5 -translate-y-1/2 rounded-sm p-0.5"
-                aria-label="Limpiar búsqueda"
-                onClick={() => setSearchQuery("")}
-              >
-                <X className="size-4" />
-              </button>
-            ) : null}
+            <div className="relative">
+              <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+              <Input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Buscar productos…"
+                aria-label="Buscar productos por nombre"
+                className="h-10 pr-9 pl-9"
+              />
+              {searchQuery ? (
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2.5 -translate-y-1/2 rounded-sm p-0.5"
+                  aria-label="Limpiar búsqueda"
+                  onClick={() => setSearchQuery("")}
+                >
+                  <X className="size-4" />
+                </button>
+              ) : null}
+            </div>
           </div>
-        </div>
+        )}
       </header>
 
       <main className={`flex-1 px-4 ${hasItems ? "pb-28" : "pb-8"}`}>

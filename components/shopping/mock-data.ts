@@ -16,6 +16,7 @@ export const MOCK_BUSINESS: ShoppingBusiness = {
   name: "La Parrilla del Centro",
   tagline: "Delivery · Retiro en local",
   currencyCode: "UYU",
+  imageUrl: null,
 }
 
 export const MOCK_CATEGORIES: ShoppingCategory[] = [

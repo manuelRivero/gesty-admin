@@ -4,9 +4,56 @@ export const ADMIN_BILLING_SUBSCRIPTION_PATH = "/admin/billing/subscription"
 export const ADMIN_BILLING_PLANS_PATH = "/admin/billing/plans"
 export const ADMIN_BILLING_CHECKOUT_PATH = "/admin/billing/checkout"
 export const ADMIN_BILLING_PORTAL_PATH = "/admin/billing/portal"
+export const ADMIN_BILLING_CANCEL_PATH = "/admin/billing/subscription/cancel"
+export const ADMIN_BILLING_REACTIVATE_PATH =
+  "/admin/billing/subscription/reactivate"
+export const ADMIN_BILLING_CHANGE_PLAN_PATH =
+  "/admin/billing/subscription/change-plan"
 export const ADMIN_AI_QUOTA_PATH = "/admin/ai-quota"
 
 export type BillingCta = "checkout" | "portal" | "none"
+
+/**
+ * Estado de ciclo de vida calculado por el backend
+ * (`gesty-backend/src/services/billing/subscriptionLifecycle.service.ts`).
+ * Única fuente de verdad para decidir qué mostrar — el frontend no vuelve
+ * a clasificar `status`/`cancel_at_period_end` por su cuenta.
+ */
+export type BillingLifecycleState =
+  | "none"
+  | "active"
+  | "active_canceling"
+  | "past_due"
+  | "expired"
+  | "unknown"
+
+/**
+ * Qué puede hacer el admin AHORA, según el backend. Son una guía para la
+ * UI — el backend sigue siendo quien valida cada operación al ejecutarla
+ * (un botón habilitado puede igual recibir un 409 si el estado cambió
+ * entre que se calcularon estos flags y que el usuario hizo click).
+ *
+ * `can_upgrade`/`can_downgrade` son flags GENERALES del estado de la
+ * suscripción, no una clasificación por `plan_code`: no identifican qué
+ * tarjeta de plan en particular es un upgrade o un downgrade. Ver
+ * `components/billing/plan-card.tsx`.
+ */
+export interface BillingActionsDto {
+  can_checkout: boolean
+  /** @deprecated usar `can_upgrade`/`can_downgrade`. */
+  can_change_plan: boolean
+  can_cancel: boolean
+  can_reactivate: boolean
+  can_open_portal: boolean
+  can_upgrade: boolean
+  can_downgrade: boolean
+}
+
+/** Resultado de `changeBillingPlan`: nunca inferir "pagado" solo de un 200. */
+export type BillingChangePlanOutcome =
+  | "immediate_paid"
+  | "immediate_payment_pending"
+  | "scheduled"
 
 export type PlanCode =
   | "trial"
@@ -41,9 +88,26 @@ export interface BillingQuota {
 export interface BillingSubscriptionResponse {
   requires_subscription: true
   access_ok: boolean
+  /** @deprecated usar `billing_state` + `actions`. Se conserva por compatibilidad. */
   cta: BillingCta
+  billing_state: BillingLifecycleState
+  actions: BillingActionsDto
   subscription: BillingSubscription | null
   quota: BillingQuota
+}
+
+/** Respuesta compartida de `cancel`/`reactivate`: estado + acciones + snapshot ya actualizado. */
+export interface BillingSubscriptionActionResponse {
+  billing_state: BillingLifecycleState
+  actions: BillingActionsDto
+  subscription: BillingSubscription
+}
+
+export interface BillingChangePlanResponse {
+  billing_state: BillingLifecycleState
+  actions: BillingActionsDto
+  subscription: BillingSubscription
+  billing: BillingChangePlanOutcome
 }
 
 export interface BillingPlan {
@@ -161,6 +225,38 @@ export async function createBillingCheckout(
 export async function createBillingPortal(): Promise<BillingPortalResponse> {
   const { data } = await api.post<BillingPortalResponse>(
     ADMIN_BILLING_PORTAL_PATH,
+  )
+  return data
+}
+
+/** Programa la cancelación al fin del período vigente (no inmediata). */
+export async function cancelBillingSubscription(): Promise<BillingSubscriptionActionResponse> {
+  const { data } = await api.post<BillingSubscriptionActionResponse>(
+    ADMIN_BILLING_CANCEL_PATH,
+  )
+  return data
+}
+
+/** Revierte una cancelación programada mientras la suscripción siga vigente. */
+export async function reactivateBillingSubscription(): Promise<BillingSubscriptionActionResponse> {
+  const { data } = await api.post<BillingSubscriptionActionResponse>(
+    ADMIN_BILLING_REACTIVATE_PATH,
+  )
+  return data
+}
+
+/**
+ * Cambia de plan sobre la suscripción existente (nunca crea un Checkout
+ * nuevo). El backend decide si es upgrade (inmediato) o downgrade
+ * (programado) y devuelve `billing` para que la UI informe el resultado
+ * real — un 200 por sí solo no confirma que se haya cobrado nada.
+ */
+export async function changeBillingPlan(
+  planCode: string,
+): Promise<BillingChangePlanResponse> {
+  const { data } = await api.post<BillingChangePlanResponse>(
+    ADMIN_BILLING_CHANGE_PLAN_PATH,
+    { plan_code: planCode },
   )
   return data
 }

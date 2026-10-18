@@ -2,11 +2,12 @@
 
 import { useRef, useState } from "react"
 import { useRouter } from "next/navigation"
+import Image from "next/image"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { isAxiosError } from "axios"
-import { Eye, EyeOff, LayoutDashboard } from "lucide-react"
+import { Eye, EyeOff } from "lucide-react"
 
 import { getUserRoleFromToken, resolveAccessToken, setAuthCookie } from "@/lib/auth"
 import { resolvePostLoginDestination } from "@/lib/access-control"
@@ -98,8 +99,8 @@ function LoginForm() {
   return (
     <Card className="w-full max-w-md shadow-lg">
       <CardHeader className="space-y-1 text-center">
-        <div className="mx-auto mb-2 flex size-12 items-center justify-center rounded-xl bg-foreground text-background">
-          <LayoutDashboard className="size-6" />
+        <div className="mx-auto mb-2 flex size-12 items-center justify-center overflow-hidden rounded-xl">
+          <Image src="/gesty-face.png" alt="Gesty" width={48} height={48} className="size-12 object-cover" />
         </div>
         <CardTitle className="text-2xl">Iniciar sesión</CardTitle>
         <CardDescription>

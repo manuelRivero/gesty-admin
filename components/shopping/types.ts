@@ -20,6 +20,7 @@ export interface ShoppingBusiness {
   name: string
   tagline: string | null
   currencyCode: string
+  imageUrl: string | null
   isOpen?: boolean
   nextOpenText?: string | null
   /** Solo para centrar el mapa de destino (no es la dirección del cliente). */

@@ -17,6 +17,11 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  ImageUploader,
+  emptyImageUploaderValue,
+  type ImageUploaderValue,
+} from "@/components/menu-items/image-uploader"
 import { SettingsSection } from "@/components/settings/settings-section"
 import {
   BUSINESS_UNSAVED_MESSAGE,
@@ -30,8 +35,10 @@ import {
 import { fetchBusinessCategories } from "@/lib/requests/business-categories"
 import { fetchAdminBusinessConfig } from "@/lib/requests/business-config"
 import {
+  deleteAdminBusinessImage,
   fetchAdminBusinessProfile,
   patchAdminBusinessProfile,
+  uploadAdminBusinessImage,
   type AdminBusinessProfile,
   type AdminBusinessProfilePatch,
 } from "@/lib/requests/business-profile"
@@ -142,6 +149,9 @@ export default function MyBusinessPage() {
   const [profile, setProfile] = useState<AdminBusinessProfile | null>(null)
   const [initialProfile, setInitialProfile] = useState<AdminBusinessProfile | null>(null)
   const [form, setForm] = useState<FormState | null>(null)
+  const [businessImage, setBusinessImage] = useState<ImageUploaderValue>(
+    emptyImageUploaderValue(null),
+  )
   const [takeawayEnabled, setTakeawayEnabled] = useState(false)
   const [categoryOptions, setCategoryOptions] = useState<
     BusinessCategoryOption[]
@@ -160,6 +170,7 @@ export default function MyBusinessPage() {
       setProfile(business)
       setInitialProfile(business)
       setForm(profileToForm(business))
+      setBusinessImage(emptyImageUploaderValue(business.image_url))
       setTakeawayEnabled(Boolean(config.takeaway_enabled))
       setCategoryOptions(categories)
     } catch (e) {
@@ -173,11 +184,13 @@ export default function MyBusinessPage() {
     void load()
   }, [load])
 
+  const isImageDirty = Boolean(businessImage.file) || businessImage.removed
+
   const isDirty = useMemo(() => {
     if (!form || !initialProfile) return false
     const { patch } = buildPatch(form, initialProfile)
-    return Object.keys(patch).length > 0
-  }, [form, initialProfile])
+    return Object.keys(patch).length > 0 || isImageDirty
+  }, [form, initialProfile, isImageDirty])
 
   useUnsavedChangesToast(isDirty, BUSINESS_UNSAVED_MESSAGE)
 
@@ -204,17 +217,26 @@ export default function MyBusinessPage() {
       toast.error(clientError)
       return
     }
-    if (Object.keys(patch).length === 0) {
+    if (Object.keys(patch).length === 0 && !isImageDirty) {
       toast.info("No hay cambios para guardar")
       return
     }
 
     setSaving(true)
     try {
-      const updated = await patchAdminBusinessProfile(patch)
+      let updated = initialProfile
+      if (Object.keys(patch).length > 0) {
+        updated = await patchAdminBusinessProfile(patch)
+      }
+      if (businessImage.file) {
+        updated = await uploadAdminBusinessImage(businessImage.file)
+      } else if (businessImage.removed) {
+        updated = await deleteAdminBusinessImage()
+      }
       setProfile(updated)
       setInitialProfile(updated)
       setForm(profileToForm(updated))
+      setBusinessImage(emptyImageUploaderValue(updated.image_url))
       toast.success("Negocio actualizado correctamente")
     } catch (e) {
       toast.error(errorMessage(e, "No se pudo guardar los cambios."))
@@ -226,6 +248,7 @@ export default function MyBusinessPage() {
   const handleCancel = () => {
     if (!initialProfile) return
     setForm(profileToForm(initialProfile))
+    setBusinessImage(emptyImageUploaderValue(initialProfile.image_url))
     toast.info("Cambios descartados")
   }
 
@@ -245,6 +268,18 @@ export default function MyBusinessPage() {
           Datos públicos y de contacto del local. Solo el propietario puede editarlos.
         </p>
       </div>
+
+      <SettingsSection
+        title="Imagen del negocio"
+        description="Foto o logo que se muestra a tus clientes en la tienda web."
+      >
+        <ImageUploader
+          id="biz-image"
+          label="Imagen"
+          value={businessImage}
+          onChange={setBusinessImage}
+        />
+      </SettingsSection>
 
       <SettingsSection
         title="Estado y moneda"

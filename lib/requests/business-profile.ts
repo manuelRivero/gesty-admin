@@ -16,6 +16,7 @@ export interface AdminBusinessProfile {
   category: string | null
   currency_code: string
   is_active: boolean
+  image_url: string | null
 }
 
 export type AdminBusinessProfilePatch = Partial<{
@@ -41,6 +42,37 @@ export async function patchAdminBusinessProfile(
   const { data } = await api.patch<AdminBusinessProfile>(
     ADMIN_BUSINESS_PROFILE_PATH,
     payload,
+  )
+  return data
+}
+
+/** Sube o reemplaza la imagen del negocio (multipart field `image`). */
+export async function uploadAdminBusinessImage(
+  file: File,
+): Promise<AdminBusinessProfile> {
+  const formData = new FormData()
+  formData.append("image", file)
+  const { data } = await api.post<AdminBusinessProfile>(
+    `${ADMIN_BUSINESS_PROFILE_PATH}/image`,
+    formData,
+    {
+      transformRequest: [
+        (body, headers) => {
+          if (headers && typeof headers === "object") {
+            delete (headers as Record<string, unknown>)["Content-Type"]
+          }
+          return body
+        },
+      ],
+    },
+  )
+  return data
+}
+
+/** Elimina la imagen del negocio en storage y BD. */
+export async function deleteAdminBusinessImage(): Promise<AdminBusinessProfile> {
+  const { data } = await api.delete<AdminBusinessProfile>(
+    `${ADMIN_BUSINESS_PROFILE_PATH}/image`,
   )
   return data
 }

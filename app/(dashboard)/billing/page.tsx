@@ -5,9 +5,10 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { isAxiosError } from "axios"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
-import { AlertCircle, ExternalLink, Loader2, Wallet } from "lucide-react"
+import { AlertCircle, ExternalLink, Loader2, Undo2, Wallet, XCircle } from "lucide-react"
 import { toast } from "sonner"
 
+import { CancelSubscriptionModal } from "@/components/billing/cancel-subscription-modal"
 import { PlanCard } from "@/components/billing/plan-card"
 import { QuotaSection } from "@/components/billing/quota-section"
 import { SubscriptionStatusBadge } from "@/components/billing/subscription-status-badge"
@@ -22,11 +23,14 @@ import {
 } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
+  cancelBillingSubscription,
+  changeBillingPlan,
   createBillingCheckout,
   createBillingPortal,
   fetchBillingPlans,
   fetchBillingSubscription,
   isCurrentBillingPlan,
+  reactivateBillingSubscription,
   type BillingPlan,
   type BillingSubscriptionResponse,
 } from "@/lib/requests/billing"
@@ -87,7 +91,8 @@ export default function BillingPage() {
   )
 }
 
-function BillingPageContent() {
+/** Exportado (además del default) para poder testear sin mockear `Suspense`. */
+export function BillingPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const bootstrapped = useRef(false)
@@ -98,7 +103,11 @@ function BillingPageContent() {
   const [plans, setPlans] = useState<BillingPlan[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [checkoutPlanCode, setCheckoutPlanCode] = useState<string | null>(null)
+  const [changePlanCode, setChangePlanCode] = useState<string | null>(null)
   const [isPortalLoading, setIsPortalLoading] = useState(false)
+  const [isCancelPending, setIsCancelPending] = useState(false)
+  const [isReactivatePending, setIsReactivatePending] = useState(false)
+  const [cancelModalOpen, setCancelModalOpen] = useState(false)
 
   const applyPayload = useCallback(
     (
@@ -206,6 +215,88 @@ function BillingPageContent() {
     }
   }
 
+  const handleConfirmCancel = async () => {
+    setIsCancelPending(true)
+    try {
+      const result = await cancelBillingSubscription()
+      setBilling((prev) =>
+        prev
+          ? {
+              ...prev,
+              billing_state: result.billing_state,
+              actions: result.actions,
+              subscription: result.subscription,
+            }
+          : prev,
+      )
+      setCancelModalOpen(false)
+      toast.success(
+        `Cancelación programada para el ${formatDateLabel(result.subscription.current_period_end)}. El acceso sigue activo hasta esa fecha.`,
+      )
+    } catch (err) {
+      // No se cierra el modal ni se toca `billing` — el estado anterior,
+      // confirmado, sigue siendo el que se muestra.
+      toast.error(errorMessage(err, "No se pudo programar la cancelación."))
+    } finally {
+      setIsCancelPending(false)
+    }
+  }
+
+  const handleReactivate = async () => {
+    setIsReactivatePending(true)
+    try {
+      const result = await reactivateBillingSubscription()
+      setBilling((prev) =>
+        prev
+          ? {
+              ...prev,
+              billing_state: result.billing_state,
+              actions: result.actions,
+              subscription: result.subscription,
+            }
+          : prev,
+      )
+      toast.success("Se revirtió la cancelación. Tu suscripción sigue activa.")
+    } catch (err) {
+      toast.error(errorMessage(err, "No se pudo reactivar la suscripción."))
+    } finally {
+      setIsReactivatePending(false)
+    }
+  }
+
+  const handleChangePlan = async (planCode: string) => {
+    setChangePlanCode(planCode)
+    try {
+      const result = await changeBillingPlan(planCode)
+      // La cuota (`quota`) puede cambiar con un upgrade inmediato y la
+      // respuesta de change-plan no la incluye — se vuelve a consultar el
+      // estado completo en vez de fusionar parcialmente. El backend ya
+      // sincronizó `subscription` de forma síncrona antes de responder,
+      // así que esta consulta ya refleja el cambio, sin necesidad de
+      // reintentos (a diferencia del Checkout, que depende del webhook).
+      const subscriptionData = await fetchBillingSubscription()
+      setBilling(subscriptionData)
+
+      if (result.billing === "immediate_paid") {
+        toast.success("Cambio de plan aplicado y pago confirmado.")
+      } else if (result.billing === "immediate_payment_pending") {
+        toast.warning(
+          "El plan cambió, pero el pago de la diferencia todavía no se confirmó. Revisá el estado desde \"Gestionar facturación\".",
+        )
+      } else {
+        toast.success(
+          `Cambio de plan programado para el ${formatDateLabel(result.subscription.current_period_end)}. Tu plan actual sigue vigente hasta entonces.`,
+        )
+      }
+    } catch (err) {
+      // No se actualiza `billing` — un 409 (ej. orden ambiguo entre planes,
+      // o estado incompatible) no debe simular un cambio que no ocurrió.
+      toast.error(errorMessage(err, "No se pudo cambiar de plan."))
+    } finally {
+      setChangePlanCode(null)
+    }
+  }
+
   if (isLoading) {
     return <BillingLoadingSkeleton />
   }
@@ -224,7 +315,14 @@ function BillingPageContent() {
     )
   }
 
-  const { subscription, quota, access_ok: accessOk, cta } = billing
+  const { subscription, quota, access_ok: accessOk, billing_state: billingState, actions } = billing
+
+  const showPlansGrid = actions.can_checkout || actions.can_upgrade || actions.can_downgrade
+  const gridMode: "subscribe" | "change-plan" =
+    billingState === "active" || billingState === "active_canceling"
+      ? "change-plan"
+      : "subscribe"
+  const changeBusy = changePlanCode !== null
 
   return (
     <div className="flex flex-col gap-6">
@@ -232,8 +330,8 @@ function BillingPageContent() {
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-semibold tracking-tight">Facturación</h1>
           <SubscriptionStatusBadge
-            subscription={subscription}
-            accessOk={accessOk}
+            billingState={billingState}
+            isTrial={subscription?.is_trial}
           />
         </div>
         <p className="text-muted-foreground">
@@ -241,7 +339,29 @@ function BillingPageContent() {
         </p>
       </div>
 
-      {!accessOk ? (
+      {billingState === "unknown" ? (
+        <Alert>
+          <AlertCircle />
+          <AlertTitle>No pudimos verificar el estado de tu suscripción</AlertTitle>
+          <AlertDescription>
+            El backend devolvió un estado que todavía no reconocemos. Si
+            necesitás suscribirte o gestionar el pago, probá las acciones
+            disponibles abajo; si el problema persiste, contactá a soporte.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      {billingState === "past_due" ? (
+        <Alert variant="destructive">
+          <AlertCircle />
+          <AlertTitle>Pago pendiente o fallido</AlertTitle>
+          <AlertDescription>
+            El asistente está pausado hasta regularizar el pago. Usá
+            &quot;Gestionar facturación&quot; para actualizar el método de
+            pago.
+          </AlertDescription>
+        </Alert>
+      ) : !accessOk ? (
         <Alert variant="destructive">
           <AlertCircle />
           <AlertTitle>Tu plan no está activo</AlertTitle>
@@ -252,13 +372,14 @@ function BillingPageContent() {
         </Alert>
       ) : null}
 
-      {subscription?.cancel_at_period_end ? (
+      {billingState === "active_canceling" && subscription ? (
         <Alert className="border-amber-500/40 bg-amber-500/5">
           <AlertCircle className="text-amber-600" />
           <AlertTitle>Cancelación programada</AlertTitle>
           <AlertDescription>
             La suscripción se cancela al fin del período (
-            {formatDateLabel(subscription.current_period_end)}).
+            {formatDateLabel(subscription.current_period_end)}). El acceso
+            sigue activo hasta esa fecha.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -277,7 +398,7 @@ function BillingPageContent() {
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap items-center gap-3">
-          {cta === "portal" ? (
+          {actions.can_open_portal ? (
             <Button onClick={() => void handlePortal()} disabled={isPortalLoading}>
               {isPortalLoading ? (
                 <>
@@ -293,29 +414,50 @@ function BillingPageContent() {
             </Button>
           ) : null}
 
-          {cta === "checkout" && subscription?.is_trial ? (
-            <p className="text-sm text-muted-foreground">
-              Estás en prueba
-              {subscription.trial_end
-                ? ` hasta ${formatDateLabel(subscription.trial_end)}`
-                : ""}
-              . Podés suscribirte cuando quieras; el pago se completa en Stripe
-              Checkout.
-            </p>
+          {actions.can_reactivate ? (
+            <Button
+              variant="outline"
+              onClick={() => void handleReactivate()}
+              disabled={isReactivatePending}
+            >
+              {isReactivatePending ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Reactivando…
+                </>
+              ) : (
+                <>
+                  <Undo2 className="size-4" />
+                  Revertir cancelación
+                </>
+              )}
+            </Button>
           ) : null}
 
-          {cta === "checkout" && !subscription?.is_trial ? (
-            <p className="text-sm text-muted-foreground">
-              Elegí un plan para continuar. El pago se completa en Stripe
-              Checkout.
-            </p>
+          {actions.can_cancel ? (
+            <Button
+              variant="outline"
+              className="text-destructive hover:text-destructive"
+              onClick={() => setCancelModalOpen(true)}
+              disabled={isCancelPending}
+            >
+              <XCircle className="size-4" />
+              Cancelar suscripción
+            </Button>
           ) : null}
 
-          {cta === "none" ? (
+          {billingState === "none" ? (
             <p className="text-sm text-muted-foreground">
               {subscription?.is_trial
                 ? "Estás en período de prueba. No hace falta pagar hasta que venza."
-                : "No hay acción de facturación pendiente."}
+                : "Elegí un plan para continuar. El pago se completa en Stripe Checkout."}
+            </p>
+          ) : null}
+
+          {billingState === "expired" ? (
+            <p className="text-sm text-muted-foreground">
+              Tu suscripción anterior ya terminó. Elegí un plan para
+              continuar — se abre un Checkout nuevo.
             </p>
           ) : null}
         </CardContent>
@@ -323,14 +465,16 @@ function BillingPageContent() {
 
       <QuotaSection quota={quota} />
 
-      {cta === "checkout" ? (
+      {showPlansGrid ? (
         <div className="flex flex-col gap-4">
           <div>
             <h2 className="text-lg font-semibold tracking-tight">Planes</h2>
             <p className="text-sm text-muted-foreground">
-              {subscription?.is_trial
-                ? "Tu plan actual es Trial (gratis). Elegí un plan pago cuando quieras continuar."
-                : "Suscripción mensual por local. Serás redirigido a Stripe para pagar."}
+              {gridMode === "change-plan"
+                ? "Cambiá de plan cuando quieras. El resultado (inmediato o programado para el fin del período) lo decide Stripe según el plan elegido."
+                : subscription?.is_trial
+                  ? "Tu plan actual es Trial (gratis). Elegí un plan pago cuando quieras continuar."
+                  : "Suscripción mensual por local. Serás redirigido a Stripe para pagar."}
             </p>
           </div>
           {plans.length === 0 ? (
@@ -344,15 +488,33 @@ function BillingPageContent() {
                   key={plan.code}
                   plan={plan}
                   isCurrent={isCurrentBillingPlan(plan, subscription)}
-                  isCheckoutPending={checkoutPlanCode === plan.code}
-                  checkoutBusy={checkoutPlanCode !== null}
+                  mode={gridMode}
+                  isCheckoutPending={
+                    gridMode === "change-plan"
+                      ? changePlanCode === plan.code
+                      : checkoutPlanCode === plan.code
+                  }
+                  checkoutBusy={
+                    gridMode === "change-plan"
+                      ? changeBusy
+                      : checkoutPlanCode !== null
+                  }
                   onSubscribe={handleSubscribe}
+                  onChangePlan={(code) => void handleChangePlan(code)}
                 />
               ))}
             </div>
           )}
         </div>
       ) : null}
+
+      <CancelSubscriptionModal
+        open={cancelModalOpen}
+        pending={isCancelPending}
+        periodEndLabel={formatDateLabel(subscription?.current_period_end)}
+        onOpenChange={setCancelModalOpen}
+        onConfirm={handleConfirmCancel}
+      />
     </div>
   )
 }

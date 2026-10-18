@@ -82,7 +82,11 @@ export function ShoppingMarketplacePage({
     <div className="bg-background mx-auto flex min-h-dvh w-full max-w-5xl flex-col">
       <header className="bg-background/95 sticky top-0 z-20 border-b backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="flex items-center gap-2 px-4 pt-4">
-          <img src="/icon.svg" alt="" className="size-8 shrink-0 rounded-lg" />
+          <img
+            src="/gesty-face.png"
+            alt=""
+            className="size-8 shrink-0 rounded-lg object-cover"
+          />
           <span className="text-lg font-semibold tracking-tight">Gesty</span>
         </div>
         <div className="space-y-1 px-4 pt-3">

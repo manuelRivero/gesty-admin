@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
@@ -170,8 +171,8 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border px-4 py-3">
         <Link href="/" className="flex items-center gap-2">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-foreground text-background">
-            <LayoutDashboard className="size-4" />
+          <div className="flex size-8 items-center justify-center overflow-hidden rounded-lg">
+            <Image src="/gesty-face.png" alt="Gesty" width={32} height={32} className="size-8 object-cover" />
           </div>
           <span className="text-lg font-semibold">Admin</span>
         </Link>

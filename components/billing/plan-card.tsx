@@ -48,17 +48,32 @@ function isFreePrice(price: string | null): boolean {
 interface PlanCardProps {
   plan: BillingPlan
   isCurrent?: boolean
+  /**
+   * "subscribe": no hay suscripción vigente (o ya terminó) — el botón
+   * inicia un Checkout nuevo (`onSubscribe`).
+   * "change-plan": ya existe una suscripción vigente — el botón pide un
+   * cambio de plan sobre esa misma suscripción (`onChangePlan`), NUNCA un
+   * Checkout nuevo. El backend decide si es upgrade o downgrade; esta
+   * tarjeta no lo adivina ni lo rotula — el DTO no identifica qué plan
+   * concreto es upgrade/downgrade (`actions.can_upgrade`/`can_downgrade`
+   * son flags generales del estado, no por plan), así que el botón usa
+   * una etiqueta neutral ("Cambiar a {plan}") en vez de "Upgrade"/"Downgrade".
+   */
+  mode?: "subscribe" | "change-plan"
   isCheckoutPending?: boolean
   checkoutBusy?: boolean
   onSubscribe: (planCode: string) => void
+  onChangePlan?: (planCode: string) => void
 }
 
 export function PlanCard({
   plan,
   isCurrent = false,
+  mode = "subscribe",
   isCheckoutPending = false,
   checkoutBusy = false,
   onSubscribe,
+  onChangePlan,
 }: PlanCardProps) {
   const lines = featureLines(plan.features)
   const trial = isTrialPlan(plan)
@@ -67,6 +82,14 @@ export function PlanCard({
     !free && plan.monthly_price_usd != null && plan.monthly_price_usd !== ""
       ? `USD ${plan.monthly_price_usd}`
       : null
+
+  const handleClick = () => {
+    if (mode === "change-plan") {
+      onChangePlan?.(plan.code)
+      return
+    }
+    onSubscribe(plan.code)
+  }
 
   return (
     <Card
@@ -140,17 +163,19 @@ export function PlanCard({
           disabled={
             isCurrent || trial || !plan.can_subscribe || checkoutBusy
           }
-          onClick={() => onSubscribe(plan.code)}
+          onClick={handleClick}
         >
           {isCheckoutPending ? (
             <>
               <Loader2 className="size-4 animate-spin" />
-              Redirigiendo…
+              {mode === "change-plan" ? "Cambiando…" : "Redirigiendo…"}
             </>
           ) : isCurrent ? (
             "Plan actual"
           ) : trial ? (
             "Incluido en prueba"
+          ) : mode === "change-plan" ? (
+            `Cambiar a ${plan.name}`
           ) : (
             `Elegir ${plan.name}`
           )}
