@@ -1,13 +1,15 @@
 "use client"
 
-import { useEffect, useRef } from "react"
-import { Bot, Loader2 } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import { Bot, Loader2, ShoppingCart } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { MessageBubble, type Message } from "./message-bubble"
 import { MessageInput } from "./message-input"
 import { ConversationSentimentBanner } from "./conversation-sentiment-banner"
+import { DraftOrderModal } from "./draft-order-modal"
 import type { ChatItemData } from "./chat-item"
 
 interface ChatWindowProps {
@@ -31,6 +33,7 @@ export function ChatWindow({
 }: ChatWindowProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const sentiment = chat.aiSentiment ?? null
+  const [isCartOpen, setIsCartOpen] = useState(false)
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -79,8 +82,27 @@ export function ChatWindow({
               aria-label="Alternar bot de conversación"
             />
           </div>
+          {!botEnabled ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setIsCartOpen(true)}
+            >
+              <ShoppingCart className="size-4" />
+              Ver carrito
+            </Button>
+          ) : null}
         </div>
       </div>
+
+      {!botEnabled ? (
+        <DraftOrderModal
+          open={isCartOpen}
+          onOpenChange={setIsCartOpen}
+          conversationId={chat.id}
+          customerName={chat.customerName}
+        />
+      ) : null}
 
       {sentiment ? (
         <ConversationSentimentBanner
