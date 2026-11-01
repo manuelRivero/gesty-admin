@@ -58,6 +58,16 @@ export type BusinessConfigBotPersonalityRef = {
   name: string
 } | null
 
+/**
+ * Capacidades comerciales resueltas por el backend a partir del plan
+ * vigente (`businessCapabilities.service.ts`). Solo lectura: no se setean
+ * desde la UI ni se envían en el PATCH.
+ */
+export interface AdminBusinessCapabilities {
+  ai: boolean
+  shopping: boolean
+}
+
 export interface AdminBusinessConfig {
   bot_enabled: boolean
   /** Kill switch del canal web (vitrina + pedidos storefront). Independiente de `bot_enabled`. */
@@ -88,9 +98,12 @@ export interface AdminBusinessConfig {
   bot_personality: BusinessConfigBotPersonalityRef
   operate_when_closed: boolean
   orders_when_closed: boolean
+  capabilities: AdminBusinessCapabilities
 }
 
-export type AdminBusinessConfigPatch = Partial<AdminBusinessConfig>
+export type AdminBusinessConfigPatch = Partial<
+  Omit<AdminBusinessConfig, "capabilities">
+>
 
 function normalizeAdminBusinessConfig(data: AdminBusinessConfig): AdminBusinessConfig {
   return {
@@ -110,6 +123,9 @@ function normalizeAdminBusinessConfig(data: AdminBusinessConfig): AdminBusinessC
     bot_personality: data.bot_personality ?? null,
     operate_when_closed: data.operate_when_closed ?? false,
     orders_when_closed: data.orders_when_closed ?? false,
+    // Fail-closed: si el backend no manda capabilities (p.ej. respuesta de
+    // POST legacy), no habilitar funciones de IA por default.
+    capabilities: data.capabilities ?? { ai: false, shopping: false },
   }
 }
 

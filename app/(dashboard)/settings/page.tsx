@@ -40,6 +40,7 @@ type SettingsData = AdminBusinessConfig
 const PATCH_EXCLUDED_KEYS = new Set<keyof SettingsData>([
   "bot_personality",
   "checkout_enabled",
+  "capabilities",
 ])
 
 export default function SettingsPage() {
@@ -327,14 +328,18 @@ export default function SettingsPage() {
           <ToggleField
             id="humanize-messages"
             label="Humanizar mensajes"
-            description="Humaniza mensajes determinísticos con la personalidad elegida"
+            description={
+              settings.capabilities.ai
+                ? "Humaniza mensajes determinísticos con la personalidad elegida"
+                : "Tu plan actual no incluye IA. Actualizá tu plan desde Facturación para habilitar esta función."
+            }
             checked={settings.humanize_messages}
             onCheckedChange={(checked) =>
               updateSetting("humanize_messages", checked)
             }
-            disabled={!settings.bot_enabled}
+            disabled={!settings.bot_enabled || !settings.capabilities.ai}
           />
-          {settings.humanize_messages ? (
+          {settings.humanize_messages && settings.capabilities.ai ? (
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-1">
                 <p className="text-sm font-medium">Personalidad del asistente</p>

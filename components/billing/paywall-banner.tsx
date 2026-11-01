@@ -49,7 +49,8 @@ export function BillingPaywallBanner() {
           <div>
             <p className="font-medium">Plan inactivo — el asistente está pausado</p>
             <p className="text-destructive/90">
-              Activá o renová tu suscripción para seguir operando.
+              Además, tu negocio dejó de aparecer en el listado de pedidos online (Shopping). Activá o
+              renová tu suscripción para volver a recibir pedidos y reactivar el asistente.
             </p>
           </div>
         </div>

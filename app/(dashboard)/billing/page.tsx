@@ -356,7 +356,8 @@ export function BillingPageContent() {
           <AlertCircle />
           <AlertTitle>Pago pendiente o fallido</AlertTitle>
           <AlertDescription>
-            El asistente está pausado hasta regularizar el pago. Usá
+            El asistente está pausado y tu negocio no aparece en el listado
+            de pedidos online (Shopping) hasta regularizar el pago. Usá
             &quot;Gestionar facturación&quot; para actualizar el método de
             pago.
           </AlertDescription>
@@ -366,8 +367,9 @@ export function BillingPageContent() {
           <AlertCircle />
           <AlertTitle>Tu plan no está activo</AlertTitle>
           <AlertDescription>
-            El asistente está pausado. Suscribite o regularizá el pago para
-            volver a operar.
+            El asistente está pausado y tu negocio no aparece en el listado
+            de pedidos online (Shopping). Suscribite o regularizá el pago
+            para volver a operar y a recibir pedidos.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -456,8 +458,10 @@ export function BillingPageContent() {
 
           {billingState === "expired" ? (
             <p className="text-sm text-muted-foreground">
-              Tu suscripción anterior ya terminó. Elegí un plan para
-              continuar — se abre un Checkout nuevo.
+              Tu suscripción anterior ya terminó: el asistente está pausado
+              y tu negocio no aparece en el listado de pedidos online
+              (Shopping). Elegí un plan para continuar — se abre un
+              Checkout nuevo.
             </p>
           ) : null}
         </CardContent>
