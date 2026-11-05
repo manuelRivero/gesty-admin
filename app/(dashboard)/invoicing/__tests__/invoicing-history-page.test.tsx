@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { render, screen, waitFor } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import type { Mock } from "vitest"
 
 vi.mock("sonner", () => ({
@@ -141,9 +142,48 @@ describe("InvoicingHistoryPage", () => {
     await waitFor(() => {
       expect(mockedFetchInvoices).toHaveBeenCalledWith({
         status: undefined,
+        dateFrom: undefined,
+        dateTo: undefined,
         take: 25,
         skip: 0,
       })
+    })
+  })
+
+  it("ofrece un filtro por período (desde/hasta) y lo envía al backend", async () => {
+    mockedFetchInvoices.mockResolvedValue({ invoices: [] })
+    const user = userEvent.setup()
+
+    render(<InvoicingHistoryPage />)
+
+    await waitFor(() => {
+      expect(mockedFetchInvoices).toHaveBeenCalledWith(
+        expect.objectContaining({ dateFrom: undefined, dateTo: undefined }),
+      )
+    })
+
+    await user.type(screen.getByLabelText("Desde"), "2026-01-01")
+
+    await waitFor(() => {
+      expect(mockedFetchInvoices).toHaveBeenCalledWith(
+        expect.objectContaining({ dateFrom: "2026-01-01", dateTo: undefined }),
+      )
+    })
+
+    await user.type(screen.getByLabelText("Hasta"), "2026-01-31")
+
+    await waitFor(() => {
+      expect(mockedFetchInvoices).toHaveBeenCalledWith(
+        expect.objectContaining({ dateFrom: "2026-01-01", dateTo: "2026-01-31" }),
+      )
+    })
+
+    await user.click(screen.getByRole("button", { name: "Limpiar período" }))
+
+    await waitFor(() => {
+      expect(mockedFetchInvoices).toHaveBeenCalledWith(
+        expect.objectContaining({ dateFrom: undefined, dateTo: undefined }),
+      )
     })
   })
 

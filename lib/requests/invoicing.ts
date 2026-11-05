@@ -264,11 +264,13 @@ export async function fetchInvoicingUsage(
 
 /**
  * Lista paginada por `take`/`skip` (sin conteo total: el backend no lo
- * devuelve). El filtro por período NO existe en el backend — solo por
- * `status` — no se agrega un selector de fechas que no tenga endpoint real.
+ * devuelve). `dateFrom`/`dateTo` filtran por `created_at` ("YYYY-MM-DD"),
+ * mismo nombrado que `fetchAdminOrders`.
  */
 export async function fetchInvoicingInvoices(options: {
   status?: FiscalInvoiceStatus
+  dateFrom?: string
+  dateTo?: string
   take?: number
   skip?: number
 }): Promise<InvoicesListResponse> {

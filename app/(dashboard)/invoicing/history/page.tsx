@@ -17,6 +17,8 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import {
   Select,
   SelectContent,
@@ -170,6 +172,8 @@ function RetryInvoiceButton({
 export default function InvoicingHistoryPage() {
   const [invoices, setInvoices] = useState<FiscalInvoice[]>([])
   const [statusFilter, setStatusFilter] = useState<"all" | FiscalInvoiceStatus>("all")
+  const [dateFrom, setDateFrom] = useState("")
+  const [dateTo, setDateTo] = useState("")
   const [skip, setSkip] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
@@ -182,6 +186,8 @@ export default function InvoicingHistoryPage() {
       try {
         const { invoices: page } = await fetchInvoicingInvoices({
           status: statusFilter === "all" ? undefined : statusFilter,
+          dateFrom: dateFrom || undefined,
+          dateTo: dateTo || undefined,
           take: PAGE_SIZE,
           skip: nextSkip,
         })
@@ -195,13 +201,13 @@ export default function InvoicingHistoryPage() {
         setIsLoadingMore(false)
       }
     },
-    [statusFilter],
+    [statusFilter, dateFrom, dateTo],
   )
 
   useEffect(() => {
     void loadPage(0, true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter])
+  }, [statusFilter, dateFrom, dateTo])
 
   const handleInvoiceResolved = useCallback((updated: FiscalInvoice) => {
     setInvoices((current) =>
@@ -225,26 +231,58 @@ export default function InvoicingHistoryPage() {
         </p>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <Select
-          value={statusFilter}
-          onValueChange={(value) => setStatusFilter(value as "all" | FiscalInvoiceStatus)}
-        >
-          <SelectTrigger className="w-56">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {STATUS_FILTER_OPTIONS.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <p className="text-xs text-muted-foreground">
-          El filtro por período todavía no está disponible: el backend no lo admite en este
-          endpoint.
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
+        <div className="grid gap-2">
+          <Label htmlFor="invoices-status">Estado</Label>
+          <Select
+            value={statusFilter}
+            onValueChange={(value) => setStatusFilter(value as "all" | FiscalInvoiceStatus)}
+          >
+            <SelectTrigger id="invoices-status" className="w-56">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {STATUS_FILTER_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="invoices-from">Desde</Label>
+          <Input
+            id="invoices-from"
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="w-[11rem]"
+          />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="invoices-to">Hasta</Label>
+          <Input
+            id="invoices-to"
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="w-[11rem]"
+          />
+        </div>
+        {dateFrom || dateTo ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-fit"
+            onClick={() => {
+              setDateFrom("")
+              setDateTo("")
+            }}
+          >
+            Limpiar período
+          </Button>
+        ) : null}
       </div>
 
       {isLoading ? (
