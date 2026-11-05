@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Building2, Megaphone, Shield } from "lucide-react"
+import { Building2, Megaphone, Receipt, Shield } from "lucide-react"
 
 import {
   Sidebar,
@@ -19,6 +19,7 @@ import {
 
 const BUSINESSES_HREF = "/super-admin/businesses"
 const ANNOUNCEMENTS_HREF = "/super-admin/announcements"
+const INVOICING_HREF = "/super-admin/invoicing"
 
 export function SuperAdminSidebar() {
   const pathname = usePathname()
@@ -26,6 +27,8 @@ export function SuperAdminSidebar() {
     pathname === BUSINESSES_HREF || pathname.startsWith(`${BUSINESSES_HREF}/`)
   const announcementsActive =
     pathname === ANNOUNCEMENTS_HREF || pathname.startsWith(`${ANNOUNCEMENTS_HREF}/`)
+  const invoicingActive =
+    pathname === INVOICING_HREF || pathname.startsWith(`${INVOICING_HREF}/`)
 
   return (
     <Sidebar>
@@ -55,6 +58,14 @@ export function SuperAdminSidebar() {
                   <Link href={ANNOUNCEMENTS_HREF}>
                     <Megaphone className="size-4" />
                     <span>Anuncios</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={invoicingActive}>
+                  <Link href={INVOICING_HREF}>
+                    <Receipt className="size-4" />
+                    <span>Facturación</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

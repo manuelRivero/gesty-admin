@@ -23,6 +23,7 @@ import {
   Sparkles,
   Users,
   Wallet,
+  Receipt,
 } from "lucide-react"
 
 import {
@@ -144,6 +145,12 @@ const navItems: {
     title: "Facturación",
     href: "/billing",
     icon: Wallet,
+    allowedRoles: ["ADMIN", "OWNER"],
+  },
+  {
+    title: "Facturación electrónica",
+    href: "/invoicing",
+    icon: Receipt,
     allowedRoles: ["ADMIN", "OWNER"],
   },
   {
