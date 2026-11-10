@@ -13,7 +13,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { io, type Socket } from "socket.io-client"
 import { toast } from "sonner"
 
-import { getAuthCookie } from "@/lib/auth"
+import { getAuthCookie, getUserIdFromCookie } from "@/lib/auth"
 import { getSocketBaseUrl } from "@/lib/socket-base-url"
 import { cn } from "@/lib/utils"
 import { getOrderStatusLabelEs } from "@/lib/constants/orderWorkflow"
@@ -28,10 +28,12 @@ import {
   isAdminWhatsappSupportRequestedPayload,
   isAdminWhatsappBotAutoReactivatedPayload,
   isAdminConversationSentimentPayload,
+  isAdminTableTabRealtimePayload,
   type AdminOrderRealtimePayload,
   type AdminReservationRealtimePayload,
   type AdminWhatsappRealtimePayload,
   type AdminConversationSentimentPayload,
+  type AdminTableTabRealtimePayload,
 } from "@/lib/types/admin-realtime"
 import {
   getSentimentLabelEs,
@@ -43,6 +45,7 @@ export type AdminNotificationKind =
   | "order"
   | "reservation"
   | "whatsapp_support"
+  | "table_tab"
 
 export interface AdminNotification {
   id: string
@@ -91,6 +94,10 @@ type AdminSocketContextValue = {
   whatsappSentimentByConversation: Record<string, WhatsappSentimentConversationMeta>
   subscribeToConversationSentiment: (
     cb: (payload: AdminConversationSentimentPayload) => void,
+  ) => () => void
+  /** Evento `admin:table_tab` (`table_tab.closed`) — ciclo de vida de la cuenta de salón. */
+  subscribeToTableTabRealtime: (
+    cb: (payload: AdminTableTabRealtimePayload) => void,
   ) => () => void
 }
 
@@ -189,6 +196,9 @@ export function AdminSocketProvider({ children }: { children: React.ReactNode })
   const conversationSentimentListenersRef = useRef(
     new Set<(payload: AdminConversationSentimentPayload) => void>(),
   )
+  const tableTabRealtimeListenersRef = useRef(
+    new Set<(payload: AdminTableTabRealtimePayload) => void>(),
+  )
   const socketRef = useRef<Socket | null>(null)
 
   const subscribeToOrderRealtime = useCallback(
@@ -226,6 +236,16 @@ export function AdminSocketProvider({ children }: { children: React.ReactNode })
       conversationSentimentListenersRef.current.add(cb)
       return () => {
         conversationSentimentListenersRef.current.delete(cb)
+      }
+    },
+    [],
+  )
+
+  const subscribeToTableTabRealtime = useCallback(
+    (cb: (payload: AdminTableTabRealtimePayload) => void) => {
+      tableTabRealtimeListenersRef.current.add(cb)
+      return () => {
+        tableTabRealtimeListenersRef.current.delete(cb)
       }
     },
     [],
@@ -282,6 +302,14 @@ export function AdminSocketProvider({ children }: { children: React.ReactNode })
         prev.map((n) =>
           n.kind === "reservation" ? { ...n, read: true } : n,
         ),
+      )
+    }
+  }, [pathname])
+
+  useEffect(() => {
+    if (pathname === "/pos") {
+      setNotifications((prev) =>
+        prev.map((n) => (n.kind === "table_tab" ? { ...n, read: true } : n)),
       )
     }
   }, [pathname])
@@ -583,6 +611,44 @@ export function AdminSocketProvider({ children }: { children: React.ReactNode })
       )
     })
 
+    socket.on("admin:table_tab", (raw: unknown) => {
+      if (!isAdminTableTabRealtimePayload(raw)) {
+        return
+      }
+      const p = raw
+      tableTabRealtimeListenersRef.current.forEach((fn) => {
+        try {
+          fn(p)
+        } catch {
+          /* noop */
+        }
+      })
+
+      // Aviso al mozo responsable de que ADMIN/OWNER cerraron su mesa — a
+      // nivel de contexto (no de la página `/pos`) para que llegue aunque el
+      // mozo esté en `/kds` u otra pantalla en ese momento, y quede además en
+      // la campana para el caso de que no lo haya visto en el momento (el
+      // mozo hoy no tiene forma de verlo si no es por acá, ver §4.F).
+      if (p.type === "table_tab.closed" && p.assignedUserAppUserId === getUserIdFromCookie()) {
+        const tableLabel = p.tableNames.length > 0 ? p.tableNames.join(", ") : "Tu mesa"
+        toast.success(`${tableLabel}: la cuenta fue cerrada.`)
+
+        const read = pathnameRef.current === "/pos"
+        setNotifications((prev) => {
+          const next: AdminNotification = {
+            id: `${p.type}-${p.tableTabId}-${Date.now()}`,
+            kind: "table_tab",
+            resourceId: p.tableTabId,
+            at: p.at,
+            title: `${tableLabel}: cuenta cerrada`,
+            subtitle: "Ya podés atender otra mesa.",
+            read,
+          }
+          return [next, ...prev].slice(0, 40)
+        })
+      }
+    })
+
     return () => {
       stopSupportAlertLoop()
       socket.removeAllListeners()
@@ -606,6 +672,7 @@ export function AdminSocketProvider({ children }: { children: React.ReactNode })
       subscribeToWhatsappRealtime,
       subscribeToConversationSentiment,
       whatsappSentimentByConversation,
+      subscribeToTableTabRealtime,
     }),
     [
       isConnected,
@@ -620,6 +687,7 @@ export function AdminSocketProvider({ children }: { children: React.ReactNode })
       subscribeToWhatsappRealtime,
       subscribeToConversationSentiment,
       whatsappSentimentByConversation,
+      subscribeToTableTabRealtime,
     ],
   )
 

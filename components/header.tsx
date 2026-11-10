@@ -46,7 +46,10 @@ export function Header() {
     acknowledgeWhatsappSupportConversation,
   } = useAdminSocket()
   const announcementsInbox = useAnnouncementsInboxOptional()
-  const canSeeNotifications = role === "ADMIN" || role === "OWNER"
+  // MOZO necesita ver la campana para el aviso de "tu mesa fue cerrada"
+  // (`table_tab.closed`) — hoy es el único canal que tiene para enterarse si
+  // no está activamente en `/pos` en ese momento.
+  const canSeeNotifications = role === "ADMIN" || role === "OWNER" || role === "MOZO"
   const canSeeAnnouncements =
     role !== "SUPER_ADMIN" &&
     role !== "UNKNOWN" &&
@@ -64,7 +67,7 @@ export function Header() {
 
   function handleOpenNotification(n: {
     id: string
-    kind: "order" | "reservation" | "whatsapp_support"
+    kind: "order" | "reservation" | "whatsapp_support" | "table_tab"
     resourceId: string
   }) {
     if (n.kind === "whatsapp_support") {
@@ -77,6 +80,10 @@ export function Header() {
     removeNotification(n.id)
     if (n.kind === "order") {
       router.push(`/orders?orderId=${encodeURIComponent(n.resourceId)}`)
+      return
+    }
+    if (n.kind === "table_tab") {
+      router.push("/pos")
       return
     }
     router.push("/reservations")

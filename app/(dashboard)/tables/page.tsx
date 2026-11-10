@@ -9,7 +9,6 @@ import {
   Move,
   Square,
   Circle,
-  Users,
   Trash2,
   Loader2,
   CalendarClock,
@@ -17,6 +16,7 @@ import {
 } from "lucide-react"
 
 import { useAdminSocket } from "@/contexts/admin-socket-context"
+import { TableElement, FLOOR_PLAN_CANVAS_CLASSNAME } from "@/components/tables/table-element"
 import { TablesLayoutFooter, TABLES_LAYOUT_UNSAVED_MESSAGE } from "@/components/tables/tables-layout-footer"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -63,11 +63,6 @@ import {
   type TableReservationSlot,
 } from "@/lib/requests/reservations"
 import { useUnsavedChangesToast } from "@/hooks/use-unsaved-changes-toast"
-
-const statusColors = {
-  active: "bg-emerald-500",
-  inactive: "bg-gray-400",
-}
 
 function apiErrorMessage(e: unknown, fallback: string): string {
   if (!isAxiosError(e)) return fallback
@@ -1180,11 +1175,7 @@ export default function TablesPage() {
             <CardContent className="p-0">
               <div
                 ref={canvasRef}
-                className={cn(
-                  "relative h-[600px] cursor-crosshair select-none overflow-hidden",
-                  "bg-[linear-gradient(to_right,var(--border)_1px,transparent_1px),linear-gradient(to_bottom,var(--border)_1px,transparent_1px)]",
-                  "bg-[size:20px_20px]",
-                )}
+                className={cn(FLOOR_PLAN_CANVAS_CLASSNAME, "cursor-crosshair")}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
                 onMouseLeave={handleMouseUp}
@@ -1215,15 +1206,26 @@ export default function TablesPage() {
                     )}
                   </div>
                 ) : (
-                  tablesInActiveEnvironment.map((table) => (
-                    <TableElement
-                      key={table.id}
-                      table={table}
-                      reservationSlots={reservationByTableId.get(table.id)}
-                      isSelected={selectedTableId === table.id}
-                      onMouseDown={(e) => handleMouseDown(e, table.id)}
-                    />
-                  ))
+                  tablesInActiveEnvironment.map((table) => {
+                    const slots = reservationByTableId.get(table.id)
+                    const firstSlot = slots?.[0]
+                    return (
+                      <TableElement
+                        key={table.id}
+                        table={table}
+                        color={table.isActive ? "active" : "inactive"}
+                        isSelected={selectedTableId === table.id}
+                        highlighted={Boolean(slots?.length)}
+                        topLabel={
+                          firstSlot
+                            ? `${firstSlot.timeRangeLabel}${slots && slots.length > 1 ? ` (+${slots.length - 1})` : ""}`
+                            : undefined
+                        }
+                        topLabelTitle={slots?.map((s) => s.timeRangeLabel).join(" · ")}
+                        onMouseDown={(e) => handleMouseDown(e, table.id)}
+                      />
+                    )
+                  })
                 )}
               </div>
             </CardContent>
@@ -1429,69 +1431,6 @@ export default function TablesPage() {
         onAddTable={() => addNewTable()}
         onSaveLayout={() => void saveLayout()}
       />
-    </div>
-  )
-}
-
-function TableElement({
-  table,
-  reservationSlots,
-  isSelected,
-  onMouseDown,
-}: {
-  table: UiTable
-  reservationSlots?: TableReservationSlot[]
-  isSelected: boolean
-  onMouseDown: (e: React.MouseEvent) => void
-}) {
-  const colorKey = table.isActive ? "active" : "inactive"
-  const hasReservation = Boolean(reservationSlots?.length)
-  const baseClasses = cn(
-    "absolute flex cursor-move flex-col items-center justify-center border-2 transition-shadow",
-    statusColors[colorKey],
-    isSelected && "z-10 ring-2 ring-primary ring-offset-2 ring-offset-background shadow-lg",
-    !isSelected &&
-      hasReservation &&
-      "ring-2 ring-amber-400 ring-offset-2 ring-offset-background shadow-md",
-    !isSelected && !hasReservation && "hover:shadow-md",
-  )
-
-  const size = table.shape === "circle" ? 64 : undefined
-  const width = table.shape === "rect" ? (table.width ?? 100) : size
-  const height = table.shape === "rect" ? (table.height ?? 60) : size
-
-  const firstSlot = reservationSlots?.[0]
-
-  return (
-    <div
-      className={cn(baseClasses, table.shape === "circle" ? "rounded-full" : "rounded-lg")}
-      style={{
-        left: table.x,
-        top: table.y,
-        width,
-        height,
-        transform: table.rotation ? `rotate(${table.rotation}deg)` : undefined,
-      }}
-      onMouseDown={onMouseDown}
-    >
-      <span className="text-center text-sm font-bold text-white drop-shadow-sm">
-        {table.name}
-      </span>
-      {firstSlot ? (
-        <span
-          className="mt-0.5 line-clamp-2 max-w-[95%] text-center text-[10px] font-medium leading-tight text-white drop-shadow"
-          title={reservationSlots?.map((s) => s.timeRangeLabel).join(" · ")}
-        >
-          {firstSlot.timeRangeLabel}
-          {reservationSlots && reservationSlots.length > 1
-            ? ` (+${reservationSlots.length - 1})`
-            : ""}
-        </span>
-      ) : null}
-      <span className="flex items-center gap-0.5 text-xs text-white/90">
-        <Users className="h-3 w-3" />
-        {table.capacity}
-      </span>
     </div>
   )
 }

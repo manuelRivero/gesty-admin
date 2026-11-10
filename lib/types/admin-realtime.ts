@@ -283,3 +283,55 @@ export function isAdminConversationSentimentPayload(
     typeof o.updatedAt === "string"
   )
 }
+
+/**
+ * Evento `admin:table_tab` — ciclo de vida de la cuenta de salón (backend:
+ * `AdminTableTabRealtimePayload`, `adminSocket.ts`). `table_tab.closed` avisa
+ * al mozo que ADMIN/OWNER cerraron su mesa; `table_tab.opened` avisa a
+ * ADMIN/OWNER que un mozo ocupó una mesa, para que su plano se actualice sin
+ * refetch (igual que `closed`).
+ */
+export type AdminTableTabRealtimePayload =
+  | {
+      type: "table_tab.closed"
+      businessId: string
+      tableTabId: string
+      /** `AppUser.id` del mozo responsable — comparar contra `getUserIdFromCookie()`. */
+      assignedUserAppUserId: string | null
+      /** Ids reales de las mesas liberadas — para mutar el mapa de ocupación en memoria sin refetch. */
+      tableIds: string[]
+      tableNames: string[]
+      at: string
+    }
+  | {
+      type: "table_tab.opened"
+      businessId: string
+      tableTabId: string
+      assignedUserAppUserId: string | null
+      assignedUserName: string | null
+      tableIds: string[]
+      tableNames: string[]
+      at: string
+    }
+
+export function isAdminTableTabRealtimePayload(
+  value: unknown,
+): value is AdminTableTabRealtimePayload {
+  if (!value || typeof value !== "object") return false
+  const o = value as Record<string, unknown>
+  if (
+    typeof o.businessId !== "string" ||
+    typeof o.tableTabId !== "string" ||
+    !(o.assignedUserAppUserId === null || typeof o.assignedUserAppUserId === "string") ||
+    !Array.isArray(o.tableIds) ||
+    !Array.isArray(o.tableNames) ||
+    typeof o.at !== "string"
+  ) {
+    return false
+  }
+  if (o.type === "table_tab.closed") return true
+  if (o.type === "table_tab.opened") {
+    return o.assignedUserName === null || typeof o.assignedUserName === "string"
+  }
+  return false
+}

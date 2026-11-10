@@ -380,6 +380,20 @@ export default function SettingsPage() {
           />
         </SettingsSection>
 
+        <SettingsSection
+          id="salon"
+          title="Salón"
+          description="Mesas, comandas de cocina y cobro en el local. Pensado para locales con atención en mesa."
+        >
+          <ToggleField
+            id="salon-enabled"
+            label="Habilitar módulo de salón"
+            description="Con esto on aparecen los accesos a Salón (POS) y Cocina (KDS) en el menú."
+            checked={settings.salon_enabled}
+            onCheckedChange={(checked) => updateSetting("salon_enabled", checked)}
+          />
+        </SettingsSection>
+
         {/* Human Handoff */}
         <SettingsSection
           title="Transferencia a Humano"

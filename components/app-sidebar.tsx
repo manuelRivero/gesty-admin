@@ -24,6 +24,8 @@ import {
   Users,
   Wallet,
   Receipt,
+  LayoutGrid,
+  ChefHat,
 } from "lucide-react"
 
 import {
@@ -41,18 +43,16 @@ import {
 import { getUserRoleFromCookie } from "@/lib/auth"
 import { canAccessPath, type UserRole } from "@/lib/access-control"
 import { useAdminSocket } from "@/contexts/admin-socket-context"
+import { useSalonFeature } from "@/contexts/salon-feature-context"
 
 const navItems: {
   title: string
   href: string
   icon: typeof LayoutDashboard
   allowedRoles?: UserRole[]
+  /** Fase 8.1: solo visible si `business_config.salon_enabled` está prendido. */
+  requiresSalon?: boolean
 }[] = [
-  {
-    title: "Dashboard",
-    href: "/",
-    icon: LayoutDashboard,
-  },
   {
     title: "Pedidos",
     href: "/orders",
@@ -80,6 +80,25 @@ const navItems: {
     href: "/tables",
     icon: Armchair,
     allowedRoles: ["ADMIN", "OWNER"],
+  },
+  {
+    // ADMIN/OWNER: revisan consumo y cierran cuenta (caja/supervisor).
+    // MOZO: opera la mesa (abre, toma rondas, transfiere). Ver matriz
+    // confirmada en `adminOrders.routes.ts` (auditoría vs. Fudo).
+    title: "Salón (POS)",
+    href: "/pos",
+    icon: LayoutGrid,
+    allowedRoles: ["ADMIN", "OWNER", "MOZO"],
+    requiresSalon: true,
+  },
+  {
+    // Comandas de cocina — exclusivo de MOZO, no es parte de la decisión
+    // cierre/cobro/facturación (eso quedó en ADMIN/OWNER).
+    title: "Cocina (KDS)",
+    href: "/kds",
+    icon: ChefHat,
+    allowedRoles: ["MOZO"],
+    requiresSalon: true,
   },
   {
     title: "Horarios",
@@ -165,14 +184,17 @@ export function AppSidebar() {
   const pathname = usePathname()
   const [role, setRole] = useState<UserRole>("UNKNOWN")
   const { whatsappSupportPendingCount } = useAdminSocket()
+  const { salonEnabled } = useSalonFeature()
 
   useEffect(() => {
     setRole(getUserRoleFromCookie())
   }, [])
 
-  const visibleItems = navItems.filter((item) =>
-    item.allowedRoles ? item.allowedRoles.includes(role) : canAccessPath(role, item.href)
-  )
+  const visibleItems = navItems
+    .filter((item) => (item.requiresSalon ? salonEnabled : true))
+    .filter((item) =>
+      item.allowedRoles ? item.allowedRoles.includes(role) : canAccessPath(role, item.href)
+    )
 
   return (
     <Sidebar>

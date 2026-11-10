@@ -309,7 +309,12 @@ function SidebarInset({ className, ...props }: React.ComponentProps<'main'>) {
     <main
       data-slot="sidebar-inset"
       className={cn(
-        'bg-background relative flex w-full flex-1 flex-col',
+        // `min-w-0`: sin esto, un descendiente ancho (p. ej. el canvas de
+        // `/pos` con `min-w-[900px]`) fuerza a este flex item a crecer en
+        // vez de quedarse contenido con su propio scroll interno — el bug
+        // clásico de flexbox que hacía que "se moviera todo el admin" en vez
+        // de scrollear solo el canvas.
+        'bg-background relative flex w-full min-w-0 flex-1 flex-col',
         'md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2',
         className,
       )}

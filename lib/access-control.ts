@@ -5,6 +5,7 @@ export type UserRole =
   | "MANAGER"
   | "OWNER"
   | "SUPER_ADMIN"
+  | "MOZO"
   | "UNKNOWN"
 
 /** Home del panel super-admin (listado de negocios). */
@@ -19,6 +20,7 @@ function normalizeRole(raw: unknown): UserRole {
   if (role === "MANAGER") return "MANAGER"
   if (role === "OWNER") return "OWNER"
   if (role === "SUPER_ADMIN") return "SUPER_ADMIN"
+  if (role === "MOZO") return "MOZO"
   return "UNKNOWN"
 }
 
@@ -78,6 +80,19 @@ export function canAccessPath(role: UserRole, pathname: string): boolean {
     return pathname === "/delivery" || pathname.startsWith("/delivery/")
   }
 
+  // Fase 8.1 + decisión posterior: MOZO es exclusivo de mesas/comandas
+  // (POS_TECHNICAL_DESIGN.md §4.F) — ni ADMIN ni OWNER operan /pos /kds
+  // (ver abajo), y MOZO no tiene acceso a ninguna otra pantalla del panel,
+  // mismo criterio que STAFF/DELIVERY arriba.
+  if (role === "MOZO") {
+    return (
+      pathname === "/pos" ||
+      pathname.startsWith("/pos/") ||
+      pathname === "/kds" ||
+      pathname.startsWith("/kds/")
+    )
+  }
+
   if (pathname === "/check-in" || pathname.startsWith("/check-in/")) {
     return role === "ADMIN" || role === "MANAGER" || role === "OWNER"
   }
@@ -92,6 +107,20 @@ export function canAccessPath(role: UserRole, pathname: string): boolean {
   }
   if (pathname === "/tables" || pathname.startsWith("/tables/")) {
     return role === "ADMIN" || role === "OWNER"
+  }
+  // Matriz confirmada (auditoría vs. Fudo — separa "Cerrar ventas" de
+  // "Cobrar mesa", nivel supervisor): ADMIN/OWNER SÍ necesitan /pos para
+  // revisar el consumo y cerrar la cuenta (el backend expone lectura de
+  // table-tabs a ambos, y `POST .../close` es exclusivo de ellos, no de
+  // MOZO). Operar la mesa (abrir/rondas/transferir) sigue siendo exclusivo
+  // de MOZO a nivel de backend aunque esta ruta esté abierta para ambos.
+  if (pathname === "/pos" || pathname.startsWith("/pos/")) {
+    return role === "ADMIN" || role === "OWNER"
+  }
+  // KDS (comandas de cocina) no es parte de esta decisión — sigue exclusivo
+  // de MOZO, ver rama arriba.
+  if (pathname === "/kds" || pathname.startsWith("/kds/")) {
+    return false
   }
   if (pathname === "/hours" || pathname.startsWith("/hours/")) {
     return role === "ADMIN" || role === "OWNER"
@@ -129,6 +158,7 @@ export function defaultPathForRole(role: UserRole): string {
   if (role === "STAFF") return "/check-in"
   if (role === "DELIVERY") return "/delivery"
   if (role === "SUPER_ADMIN") return SUPER_ADMIN_HOME
+  if (role === "MOZO") return "/pos"
   return "/"
 }
 

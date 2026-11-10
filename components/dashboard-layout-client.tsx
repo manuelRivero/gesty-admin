@@ -10,6 +10,7 @@ import { Header } from "@/components/header"
 import { AdminSocketProvider } from "@/contexts/admin-socket-context"
 import { AnnouncementsInboxProvider } from "@/contexts/announcements-inbox-context"
 import { AnnouncementsInboxModal } from "@/components/announcements/announcements-inbox-modal"
+import { SalonFeatureProvider } from "@/contexts/salon-feature-context"
 
 export function DashboardLayoutClient({
   children,
@@ -34,10 +35,12 @@ export function DashboardLayoutClient({
     <SidebarProvider>
       <AdminSocketProvider>
         {variant === "default" ? (
-          <AnnouncementsInboxProvider>
-            {shell}
-            <AnnouncementsInboxModal />
-          </AnnouncementsInboxProvider>
+          <SalonFeatureProvider>
+            <AnnouncementsInboxProvider>
+              {shell}
+              <AnnouncementsInboxModal />
+            </AnnouncementsInboxProvider>
+          </SalonFeatureProvider>
         ) : (
           shell
         )}

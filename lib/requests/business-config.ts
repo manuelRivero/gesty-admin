@@ -98,6 +98,8 @@ export interface AdminBusinessConfig {
   bot_personality: BusinessConfigBotPersonalityRef
   operate_when_closed: boolean
   orders_when_closed: boolean
+  /** Kill switch del módulo de salón (Fase 8.1) — POS/KDS en el sidebar dependen de esto. */
+  salon_enabled: boolean
   capabilities: AdminBusinessCapabilities
 }
 
@@ -123,6 +125,7 @@ function normalizeAdminBusinessConfig(data: AdminBusinessConfig): AdminBusinessC
     bot_personality: data.bot_personality ?? null,
     operate_when_closed: data.operate_when_closed ?? false,
     orders_when_closed: data.orders_when_closed ?? false,
+    salon_enabled: data.salon_enabled ?? false,
     // Fail-closed: si el backend no manda capabilities (p.ej. respuesta de
     // POST legacy), no habilitar funciones de IA por default.
     capabilities: data.capabilities ?? { ai: false, shopping: false },
@@ -139,6 +142,17 @@ export async function fetchBotPersonalities(): Promise<BotPersonalityOption[]> {
 export async function fetchAdminBusinessConfig(): Promise<AdminBusinessConfig> {
   const { data } = await api.get<AdminBusinessConfig>(ADMIN_BUSINESS_CONFIG_PATH)
   return normalizeAdminBusinessConfig(data)
+}
+
+/**
+ * Flag mínimo accesible también para MOZO (a diferencia de `fetchAdminBusinessConfig`,
+ * que requiere ADMIN/OWNER) — usado para gatear el sidebar/rutas de salón (POS/KDS).
+ */
+export async function fetchSalonFeatureFlag(): Promise<boolean> {
+  const { data } = await api.get<{ salon_enabled: boolean }>(
+    `${ADMIN_BUSINESS_CONFIG_PATH}/salon-enabled`,
+  )
+  return data.salon_enabled ?? false
 }
 
 export async function upsertAdminBusinessConfig(

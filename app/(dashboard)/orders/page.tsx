@@ -30,6 +30,7 @@ import {
   type BusinessUser,
 } from "@/lib/requests/business-users"
 import { fetchAdminBusinessConfig } from "@/lib/requests/business-config"
+import { DashboardShortcutButton } from "@/components/orders/dashboard-shortcut-button"
 
 function monthBoundsISO() {
   const now = new Date()
@@ -299,11 +300,14 @@ function OrdersPageContent() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Pedidos</h1>
-        <p className="text-muted-foreground">
-          Consulta y gestiona los pedidos de tus clientes
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Pedidos</h1>
+          <p className="text-muted-foreground">
+            Consulta y gestiona los pedidos de tus clientes
+          </p>
+        </div>
+        <DashboardShortcutButton />
       </div>
 
       {error ? (
