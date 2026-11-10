@@ -335,3 +335,40 @@ export function isAdminTableTabRealtimePayload(
   }
   return false
 }
+
+/**
+ * Evento `admin:kitchen`, variante `kitchen_ticket_item.ready_for_pickup`
+ * (backend: `AdminKitchenRealtimePayload`, `adminSocket.ts`) — avisa al mozo
+ * responsable de la mesa que su comanda está lista para retirar. Es la única
+ * variante de ese canal que el frontend necesita consumir fuera de `/kds`
+ * (el resto, `kitchen_ticket.created`/`kitchen_ticket_item.status_changed`,
+ * son de uso exclusivo de la pantalla de cocina vía polling REST, no socket).
+ */
+export interface AdminKitchenTicketItemReadyForPickupPayload {
+  type: "kitchen_ticket_item.ready_for_pickup"
+  businessId: string
+  kitchenTicketItemId: string
+  /** `AppUser.id` del mozo responsable — comparar contra `getUserIdFromCookie()`. */
+  assignedUserAppUserId: string | null
+  tableNames: string[]
+  menuItemName: string
+  quantity: number
+  at: string
+}
+
+export function isAdminKitchenTicketItemReadyForPickupPayload(
+  value: unknown,
+): value is AdminKitchenTicketItemReadyForPickupPayload {
+  if (!value || typeof value !== "object") return false
+  const o = value as Record<string, unknown>
+  return (
+    o.type === "kitchen_ticket_item.ready_for_pickup" &&
+    typeof o.businessId === "string" &&
+    typeof o.kitchenTicketItemId === "string" &&
+    (o.assignedUserAppUserId === null || typeof o.assignedUserAppUserId === "string") &&
+    Array.isArray(o.tableNames) &&
+    typeof o.menuItemName === "string" &&
+    typeof o.quantity === "number" &&
+    typeof o.at === "string"
+  )
+}

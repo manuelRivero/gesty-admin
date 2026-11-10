@@ -29,6 +29,7 @@ import {
   isAdminWhatsappBotAutoReactivatedPayload,
   isAdminConversationSentimentPayload,
   isAdminTableTabRealtimePayload,
+  isAdminKitchenTicketItemReadyForPickupPayload,
   type AdminOrderRealtimePayload,
   type AdminReservationRealtimePayload,
   type AdminWhatsappRealtimePayload,
@@ -46,6 +47,7 @@ export type AdminNotificationKind =
   | "reservation"
   | "whatsapp_support"
   | "table_tab"
+  | "kitchen_ready"
 
 export interface AdminNotification {
   id: string
@@ -309,7 +311,9 @@ export function AdminSocketProvider({ children }: { children: React.ReactNode })
   useEffect(() => {
     if (pathname === "/pos") {
       setNotifications((prev) =>
-        prev.map((n) => (n.kind === "table_tab" ? { ...n, read: true } : n)),
+        prev.map((n) =>
+          n.kind === "table_tab" || n.kind === "kitchen_ready" ? { ...n, read: true } : n,
+        ),
       )
     }
   }, [pathname])
@@ -647,6 +651,36 @@ export function AdminSocketProvider({ children }: { children: React.ReactNode })
           return [next, ...prev].slice(0, 40)
         })
       }
+    })
+
+    // Aviso al mozo de que su comanda está lista para retirar — mismo criterio
+    // que `table_tab.closed`: llega aunque esté en `/kds` u otra pantalla, y
+    // queda en la campana si no lo vio en el momento.
+    socket.on("admin:kitchen", (raw: unknown) => {
+      if (!isAdminKitchenTicketItemReadyForPickupPayload(raw)) {
+        return
+      }
+      const p = raw
+      if (p.assignedUserAppUserId !== getUserIdFromCookie()) {
+        return
+      }
+
+      const tableLabel = p.tableNames.length > 0 ? p.tableNames.join(", ") : "tu mesa"
+      toast.success(`Listo para retirar: ${p.quantity}× ${p.menuItemName} (${tableLabel})`)
+
+      const read = pathnameRef.current === "/pos"
+      setNotifications((prev) => {
+        const next: AdminNotification = {
+          id: `${p.type}-${p.kitchenTicketItemId}-${Date.now()}`,
+          kind: "kitchen_ready",
+          resourceId: p.kitchenTicketItemId,
+          at: p.at,
+          title: `${p.quantity}× ${p.menuItemName} listo`,
+          subtitle: tableLabel,
+          read,
+        }
+        return [next, ...prev].slice(0, 40)
+      })
     })
 
     return () => {

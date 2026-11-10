@@ -44,12 +44,14 @@ export function AddRoundDialog({
   const [isLoading, setIsLoading] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [quantities, setQuantities] = useState<Record<string, number>>({})
+  const [notesByItem, setNotesByItem] = useState<Record<string, string>>({})
   const [search, setSearch] = useState("")
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
     if (!open) return
     setQuantities({})
+    setNotesByItem({})
     setSearch("")
     setIsLoading(true)
     setLoadError(null)
@@ -77,12 +79,28 @@ export function AddRoundDialog({
       }
       return next
     })
+    if (qty <= 0) {
+      setNotesByItem((prev) => {
+        if (!(menuItemId in prev)) return prev
+        const next = { ...prev }
+        delete next[menuItemId]
+        return next
+      })
+    }
+  }
+
+  function setNote(menuItemId: string, note: string) {
+    setNotesByItem((prev) => ({ ...prev, [menuItemId]: note }))
   }
 
   async function handleSubmit() {
     const items = Object.entries(quantities)
       .filter(([, qty]) => qty > 0)
-      .map(([menuItemId, quantity]) => ({ menuItemId, quantity }))
+      .map(([menuItemId, quantity]) => ({
+        menuItemId,
+        quantity,
+        notes: notesByItem[menuItemId]?.trim() || undefined,
+      }))
     if (items.length === 0) return
 
     setSubmitting(true)
@@ -131,39 +149,48 @@ export function AddRoundDialog({
               {filteredItems.map((item) => {
                 const qty = quantities[item.id] ?? 0
                 return (
-                  <li
-                    key={item.id}
-                    className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">{item.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatMenuItemPrice(item.price, item.currencyCode)}
-                      </p>
+                  <li key={item.id} className="rounded-md border px-3 py-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{item.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatMenuItemPrice(item.price, item.currencyCode)}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="size-7"
+                          disabled={qty === 0 || submitting}
+                          onClick={() => setQuantity(item.id, qty - 1)}
+                        >
+                          <Minus className="size-3.5" />
+                        </Button>
+                        <span className="w-6 text-center text-sm tabular-nums">{qty}</span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="size-7"
+                          disabled={submitting}
+                          onClick={() => setQuantity(item.id, qty + 1)}
+                        >
+                          <Plus className="size-3.5" />
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="size-7"
-                        disabled={qty === 0 || submitting}
-                        onClick={() => setQuantity(item.id, qty - 1)}
-                      >
-                        <Minus className="size-3.5" />
-                      </Button>
-                      <span className="w-6 text-center text-sm tabular-nums">{qty}</span>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="size-7"
+                    {qty > 0 ? (
+                      <Input
+                        placeholder="Nota para cocina (ej. sin cebolla)…"
+                        value={notesByItem[item.id] ?? ""}
+                        onChange={(e) => setNote(item.id, e.target.value)}
                         disabled={submitting}
-                        onClick={() => setQuantity(item.id, qty + 1)}
-                      >
-                        <Plus className="size-3.5" />
-                      </Button>
-                    </div>
+                        maxLength={500}
+                        className="mt-2 h-8 text-xs"
+                      />
+                    ) : null}
                   </li>
                 )
               })}

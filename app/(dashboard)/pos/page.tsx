@@ -428,14 +428,21 @@ export default function PosPage() {
                     </div>
                     <ul className="mt-1 space-y-1 text-sm">
                       {order.items.map((item) => (
-                        <li key={item.id} className="flex items-center justify-between gap-2">
-                          <span className="truncate">
-                            {item.quantity}× {item.menuItemName}
-                            {item.variation ? ` (${item.variation})` : ""}
-                          </span>
-                          <span className="shrink-0 tabular-nums text-muted-foreground">
-                            {formatMenuItemPrice(item.unitPrice)}
-                          </span>
+                        <li key={item.id}>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="truncate">
+                              {item.quantity}× {item.menuItemName}
+                              {item.variation ? ` (${item.variation})` : ""}
+                            </span>
+                            <span className="shrink-0 tabular-nums text-muted-foreground">
+                              {formatMenuItemPrice(item.unitPrice)}
+                            </span>
+                          </div>
+                          {item.notes ? (
+                            <p className="truncate text-xs italic text-muted-foreground">
+                              Nota: {item.notes}
+                            </p>
+                          ) : null}
                         </li>
                       ))}
                     </ul>

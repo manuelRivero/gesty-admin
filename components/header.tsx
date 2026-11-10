@@ -67,7 +67,7 @@ export function Header() {
 
   function handleOpenNotification(n: {
     id: string
-    kind: "order" | "reservation" | "whatsapp_support" | "table_tab"
+    kind: "order" | "reservation" | "whatsapp_support" | "table_tab" | "kitchen_ready"
     resourceId: string
   }) {
     if (n.kind === "whatsapp_support") {
@@ -82,7 +82,7 @@ export function Header() {
       router.push(`/orders?orderId=${encodeURIComponent(n.resourceId)}`)
       return
     }
-    if (n.kind === "table_tab") {
+    if (n.kind === "table_tab" || n.kind === "kitchen_ready") {
       router.push("/pos")
       return
     }

@@ -84,7 +84,8 @@ const navItems: {
   {
     // ADMIN/OWNER: revisan consumo y cierran cuenta (caja/supervisor).
     // MOZO: opera la mesa (abre, toma rondas, transfiere). Ver matriz
-    // confirmada en `adminOrders.routes.ts` (auditoría vs. Fudo).
+    // confirmada en `adminOrders.routes.ts` (auditoría vs. Fudo). COCINA no
+    // entra acá — rol independiente, exclusivo de comandas (ver abajo).
     title: "Salón (POS)",
     href: "/pos",
     icon: LayoutGrid,
@@ -92,12 +93,12 @@ const navItems: {
     requiresSalon: true,
   },
   {
-    // Comandas de cocina — exclusivo de MOZO, no es parte de la decisión
-    // cierre/cobro/facturación (eso quedó en ADMIN/OWNER).
+    // Comandas de cocina — exclusivo de COCINA (rol independiente de MOZO,
+    // que no opera comandas) + ADMIN/OWNER para supervisión.
     title: "Cocina (KDS)",
     href: "/kds",
     icon: ChefHat,
-    allowedRoles: ["MOZO"],
+    allowedRoles: ["ADMIN", "OWNER", "COCINA"],
     requiresSalon: true,
   },
   {

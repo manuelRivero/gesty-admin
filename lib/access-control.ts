@@ -6,6 +6,7 @@ export type UserRole =
   | "OWNER"
   | "SUPER_ADMIN"
   | "MOZO"
+  | "COCINA"
   | "UNKNOWN"
 
 /** Home del panel super-admin (listado de negocios). */
@@ -21,6 +22,7 @@ function normalizeRole(raw: unknown): UserRole {
   if (role === "OWNER") return "OWNER"
   if (role === "SUPER_ADMIN") return "SUPER_ADMIN"
   if (role === "MOZO") return "MOZO"
+  if (role === "COCINA") return "COCINA"
   return "UNKNOWN"
 }
 
@@ -80,17 +82,17 @@ export function canAccessPath(role: UserRole, pathname: string): boolean {
     return pathname === "/delivery" || pathname.startsWith("/delivery/")
   }
 
-  // Fase 8.1 + decisión posterior: MOZO es exclusivo de mesas/comandas
-  // (POS_TECHNICAL_DESIGN.md §4.F) — ni ADMIN ni OWNER operan /pos /kds
-  // (ver abajo), y MOZO no tiene acceso a ninguna otra pantalla del panel,
-  // mismo criterio que STAFF/DELIVERY arriba.
+  // MOZO es exclusivo de mesas de salón (POS_TECHNICAL_DESIGN.md §4.F) — no
+  // tiene acceso a comandas (/kds, exclusivo de COCINA) ni a ninguna otra
+  // pantalla del panel, mismo criterio que STAFF/DELIVERY arriba.
   if (role === "MOZO") {
-    return (
-      pathname === "/pos" ||
-      pathname.startsWith("/pos/") ||
-      pathname === "/kds" ||
-      pathname.startsWith("/kds/")
-    )
+    return pathname === "/pos" || pathname.startsWith("/pos/")
+  }
+
+  // COCINA es exclusivo de comandas (/kds) — no opera mesas ni tiene acceso
+  // a ninguna otra pantalla del panel. Rol independiente de MOZO.
+  if (role === "COCINA") {
+    return pathname === "/kds" || pathname.startsWith("/kds/")
   }
 
   if (pathname === "/check-in" || pathname.startsWith("/check-in/")) {
@@ -117,10 +119,10 @@ export function canAccessPath(role: UserRole, pathname: string): boolean {
   if (pathname === "/pos" || pathname.startsWith("/pos/")) {
     return role === "ADMIN" || role === "OWNER"
   }
-  // KDS (comandas de cocina) no es parte de esta decisión — sigue exclusivo
-  // de MOZO, ver rama arriba.
+  // KDS (comandas de cocina): ADMIN/OWNER también pueden revisarlo, igual
+  // que /pos. COCINA ya resuelto en la rama exclusiva arriba.
   if (pathname === "/kds" || pathname.startsWith("/kds/")) {
-    return false
+    return role === "ADMIN" || role === "OWNER"
   }
   if (pathname === "/hours" || pathname.startsWith("/hours/")) {
     return role === "ADMIN" || role === "OWNER"
@@ -159,6 +161,7 @@ export function defaultPathForRole(role: UserRole): string {
   if (role === "DELIVERY") return "/delivery"
   if (role === "SUPER_ADMIN") return SUPER_ADMIN_HOME
   if (role === "MOZO") return "/pos"
+  if (role === "COCINA") return "/kds"
   return "/"
 }
 
